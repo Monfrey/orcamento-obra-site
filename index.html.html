@@ -263,9 +263,19 @@ async function entrarComEmailSenha(email, senha) {
   if (error) mostrarErroAuth(error.message);
 }
 async function cadastrarComEmailSenha(email, senha) {
-  const { error } = await sb.auth.signUp({ email, password: senha });
-  if (error) mostrarErroAuth(error.message);
-  else mostrarErroAuth("Conta criada! Verifique seu e-mail para confirmar antes de entrar.", true);
+  const { data, error } = await sb.auth.signUp({ email, password: senha });
+  if (error) { mostrarErroAuth(error.message); return; }
+
+  if (data.session) {
+    // Confirmação de e-mail está desativada no projeto: o Supabase já libera
+    // a sessão na hora. Não faz sentido mostrar "verifique seu e-mail" aqui —
+    // o próprio onAuthStateChange (SIGNED_IN) vai levar direto para o app.
+    return;
+  }
+
+  // Confirmação de e-mail está ativada: a conta foi criada, mas ainda não há
+  // sessão até a pessoa clicar no link recebido por e-mail.
+  mostrarErroAuth("Conta criada! Verifique seu e-mail para confirmar antes de entrar.", true);
 }
 async function entrarComGoogle() {
   await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname } });
