@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Orçamento de Obra</title>
+<meta name="theme-color" content="#2B4870" />
+<link rel="manifest" href="/manifest.json" />
+<link rel="apple-touch-icon" href="/icons/icon-192.png" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  :root {
+    --paper: #EEF2ED; --paper-line: #C9D3C6; --card-bg: #FBFCFA; --ink: #1F2A22; --ink-soft: #56635A;
+    --blueprint: #2B4870; --blueprint-deep: #1C3252; --tape: #D9A62E; --tape-soft: #F2E2B8;
+    --brick: #A8451F; --brick-soft: #F1DBCE; --approved: #3F7A4E; --approved-soft: #DCEADF;
+    --shadow: rgba(27, 42, 34, 0.10);
+  }
+  * { box-sizing: border-box; } body { margin: 0; }
+
+  .app-shell { background: var(--paper); background-image: linear-gradient(var(--paper-line) 1px, transparent 1px), linear-gradient(90deg, var(--paper-line) 1px, transparent 1px); background-size: 28px 28px; background-position: -1px -1px; min-height: 100vh; font-family: 'IBM Plex Sans', sans-serif; color: var(--ink); position: relative; padding-left: 34px; }
+  .ruler { position: fixed; left: 0; top: 0; bottom: 0; width: 34px; background: var(--blueprint-deep); display: flex; flex-direction: column; align-items: center; padding: 16px 0; z-index: 20; }
+  .ruler-mark { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; width: 100%; border-top: 1px solid rgba(255,255,255,0.18); }
+  .ruler-mark span { color: rgba(255,255,255,0.55); font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 0.05em; margin-top: 3px; writing-mode: vertical-rl; transform: rotate(180deg); }
+
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 28px; border-bottom: 2px solid var(--ink); background: var(--paper); }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-mark { width: 34px; height: 34px; background: var(--blueprint); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff; }
+  .brand-text { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 19px; letter-spacing: -0.01em; line-height: 1; }
+  .brand-sub { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--ink-soft); letter-spacing: 0.08em; text-transform: uppercase; }
+  .user-chip { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); }
+  .user-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--tape-soft); border: 1.5px solid var(--tape); display: flex; align-items: center; justify-content: center; color: var(--ink); }
+  .icon-btn { background: transparent; border: 1.5px solid var(--ink); border-radius: 6px; padding: 7px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ink); transition: background 0.15s ease, color 0.15s ease; }
+  .icon-btn:hover { background: var(--ink); color: var(--paper); }
+
+  .container { max-width: 980px; margin: 0 auto; padding: 32px 28px 80px; }
+  .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
+  .page-title { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 26px; letter-spacing: -0.01em; }
+  .page-title-eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--blueprint); margin-bottom: 4px; }
+
+  .search-row { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+  .search-box { display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--ink); border-radius: 6px; padding: 8px 12px; background: var(--card-bg); flex: 1; min-width: 220px; }
+  .search-box input { border: none; outline: none; background: transparent; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; width: 100%; color: var(--ink); }
+
+  .btn { font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; font-size: 13.5px; border-radius: 6px; padding: 10px 16px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; border: 1.5px solid transparent; transition: transform 0.1s ease, background 0.15s ease; }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+  .btn-primary { background: var(--blueprint); color: #fff; }
+  .btn-primary:hover { background: var(--blueprint-deep); }
+  .btn-ghost { background: transparent; border-color: var(--ink); color: var(--ink); }
+  .btn-ghost:hover { background: var(--ink); color: var(--paper); }
+  .btn-block { width: 100%; justify-content: center; }
+  .btn-sm { padding: 6px 11px; font-size: 12.5px; }
+
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .obra-card { background: var(--card-bg); border: 1.5px solid var(--ink); border-radius: 8px; padding: 16px 16px 14px; cursor: pointer; position: relative; box-shadow: 3px 3px 0 var(--shadow); transition: transform 0.12s ease, box-shadow 0.12s ease; }
+  .obra-card:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--shadow); }
+  .obra-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .obra-cliente { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 16.5px; }
+  .obra-meta { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .obra-valor { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 18px; margin-top: 12px; }
+  .obra-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 11.5px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; }
+
+  .stamp { font-family: 'Archivo Expanded', sans-serif; font-size: 10.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 9px; border-radius: 4px; border: 2px solid; white-space: nowrap; }
+  .stamp-rascunho { color: var(--ink-soft); border-color: var(--paper-line); border-style: dashed; transform: rotate(-2deg); }
+  .stamp-enviado { color: var(--blueprint); border-color: var(--blueprint); transform: rotate(2deg); }
+  .stamp-aprovado { color: var(--approved); border-color: var(--approved); background: var(--approved-soft); transform: rotate(-3deg); }
+  .stamp-recusado { color: var(--brick); border-color: var(--brick); background: var(--brick-soft); transform: rotate(3deg); }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--ink-soft); }
+
+  .form-section { background: var(--card-bg); border: 1.5px solid var(--ink); border-radius: 8px; padding: 20px 22px; margin-bottom: 18px; }
+  .form-eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--blueprint); margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--paper-line); }
+  .field-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field.full { grid-column: 1 / -1; }
+  .field label { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+  .field input, .field select, .field textarea { border: 1.5px solid var(--paper-line); border-radius: 5px; padding: 9px 10px; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; color: var(--ink); background: #fff; outline: none; width: 100%; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--blueprint); }
+  .field textarea { resize: vertical; min-height: 70px; }
+
+  .items-table { width: 100%; border-collapse: collapse; }
+  .items-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 600; padding: 6px 8px; border-bottom: 1.5px solid var(--ink); }
+  .items-table td { padding: 6px 8px; border-bottom: 1px solid var(--paper-line); vertical-align: middle; }
+  .items-table input, .items-table select { border: 1px solid var(--paper-line); border-radius: 4px; padding: 6px 7px; font-size: 13.5px; width: 100%; font-family: 'IBM Plex Sans', sans-serif; }
+  .items-table .num { font-family: 'IBM Plex Mono', monospace; text-align: right; }
+  .col-desc { width: 34%; } .col-un { width: 10%; } .col-qtd { width: 12%; } .col-val { width: 15%; } .col-tot { width: 15%; }
+
+  .totals-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1.5px solid var(--ink); }
+  .totals-value { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; background: var(--tape-soft); border: 1.5px solid var(--tape); padding: 4px 12px; border-radius: 5px; }
+
+  .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+
+  .detail-sheet { background: var(--card-bg); border: 1.5px solid var(--ink); border-radius: 8px; padding: 26px 28px; }
+  .detail-top { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 16px; }
+  .detail-cliente { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 22px; }
+  .detail-info { font-size: 13px; color: var(--ink-soft); margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+  .detail-block-title { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--blueprint); margin: 18px 0 8px; }
+  .condicoes-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .condicao-item { font-size: 14px; }
+  .condicao-item strong { display: block; font-size: 11.5px; color: var(--ink-soft); font-weight: 600; margin-bottom: 2px; }
+
+  svg.i { width: 15px; height: 15px; flex-shrink: 0; }
+
+  /* Tela de login */
+  .auth-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .auth-card { background: var(--card-bg); border: 1.5px solid var(--ink); border-radius: 10px; padding: 32px 28px; width: 100%; max-width: 380px; box-shadow: 4px 4px 0 var(--shadow); }
+  .auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; justify-content: center; }
+  .auth-tabs { display: flex; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; margin-bottom: 18px; }
+  .auth-tab { flex: 1; text-align: center; padding: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; border: none; color: var(--ink-soft); }
+  .auth-tab.active { background: var(--blueprint); color: #fff; }
+  .auth-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; font-size: 11.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; }
+  .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--paper-line); }
+  .auth-error { background: var(--brick-soft); color: var(--brick); border: 1px solid var(--brick); border-radius: 5px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 12px; }
+  .loading-text { text-align: center; padding: 60px 20px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+
+  @media (max-width: 720px) {
+    .app-shell { padding-left: 0; } .ruler { display: none; }
+    .field-grid, .condicoes-grid { grid-template-columns: 1fr; }
+    .container { padding: 22px 16px 60px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+/* ========================================================================
+   CONEXÃO COM O SUPABASE
+   ======================================================================== */
+const SUPABASE_URL = "https://iusghvwqotlnliafdpva.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1c2dodndxb3RsbmxpYWZkcHZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwNTIwOTAsImV4cCI6MjA5OTYyODA5MH0.85f_oUpGQ0HPF90UCZjdFjwNxDq29UNep28FSZJCZ_M";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ============ ÍCONES ============ */
+const ICON = {
+  ruler: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="8" width="20" height="8" rx="1"/><line x1="6" y1="8" x2="6" y2="12"/><line x1="10" y1="8" x2="10" y2="13"/><line x1="14" y1="8" x2="14" y2="12"/><line x1="18" y1="8" x2="18" y2="13"/></svg>`,
+  plus: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`,
+  trash: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`,
+  settings: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2" fill="currentColor"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="16" cy="12" r="2" fill="currentColor"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="10" cy="18" r="2" fill="currentColor"/></svg>`,
+  back: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>`,
+  search: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
+  pin: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+  calendar: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+  download: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  pencil: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
+  user: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
+  file: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+  logout: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
+  google: `<svg class="i" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.85A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.09A6.6 6.6 0 0 1 5.5 12c0-.73.12-1.43.34-2.09V7.06H2.18A11 11 0 0 0 1 12c0 1.77.42 3.45 1.18 4.94z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.82 6.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>`,
+};
+
+const UNIDADES = ["m²", "m³", "m", "kg", "un", "verba", "h"];
+const STATUS_LABEL = { rascunho: "Rascunho", enviado: "Enviado", aprovado: "Aprovado", recusado: "Recusado" };
+const formatBRL = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number.isFinite(v) ? v : 0);
+const uid = (p) => `${p}${Date.now()}${Math.random().toString(16).slice(2)}`;
+
+/* ============ ESTADO ============ */
+const state = {
+  view: "lista",
+  authMode: "entrar",
+  busca: "",
+  selectedId: null,
+  user: null,
+  config: { garantia: "12 meses", formaPagamento: "40% entrada + saldo na entrega" },
+  orcamentos: [],
+  form: null,
+  configDraft: null,
+};
+
+const novoItem = () => ({ id: uid("i"), descricao: "", unidade: "m²", quantidade: "", valorUnitario: "" });
+const novoForm = () => ({ cliente: "", contato: "", endereco: "", prazo: "", garantia: state.config.garantia, formaPagamento: state.config.formaPagamento, observacoes: "", itens: [novoItem()] });
+const totalItens = (itens) => itens.reduce((acc, it) => acc + Number(it.quantidade || 0) * Number(it.valorUnitario || 0), 0);
+
+/* ========================================================================
+   CAMADA DE DADOS (Supabase)
+   ======================================================================== */
+function orcamentoFromDb(o) {
+  return {
+    id: o.id, cliente: o.cliente, contato: o.contato, endereco: o.endereco, prazo: o.prazo,
+    garantia: o.garantia, formaPagamento: o.forma_pagamento, observacoes: o.observacoes,
+    status: o.status, criadoEm: new Date(o.criado_em).toLocaleDateString("pt-BR"),
+    itens: (o.itens_orcamento || []).map((it) => ({ id: it.id, descricao: it.descricao, unidade: it.unidade, quantidade: it.quantidade, valorUnitario: it.valor_unitario })),
+  };
+}
+
+async function carregarDados() {
+  const { data: { user } } = await sb.auth.getUser();
+  state.user = user;
+
+  const { data: orcamentosData, error } = await sb
+    .from("orcamentos")
+    .select("*, itens_orcamento(*)")
+    .order("criado_em", { ascending: false });
+
+  if (error) { console.error(error); state.orcamentos = []; }
+  else state.orcamentos = orcamentosData.map(orcamentoFromDb);
+
+  const { data: configData } = await sb
+    .from("configuracoes_padrao")
+    .select("*")
+    .eq("usuario_id", user.id)
+    .maybeSingle();
+
+  if (configData) {
+    state.config = { garantia: configData.garantia_padrao, formaPagamento: configData.forma_pagamento_padrao };
+  } else {
+    await sb.from("configuracoes_padrao").insert({
+      usuario_id: user.id,
+      garantia_padrao: state.config.garantia,
+      forma_pagamento_padrao: state.config.formaPagamento,
+    });
+  }
+}
+
+async function salvarOrcamentoSupabase(f) {
+  if (!f.cliente.trim()) { alert("Informe o nome do cliente antes de salvar."); return; }
+  const { data: orcamentoInserido, error } = await sb
+    .from("orcamentos")
+    .insert({
+      usuario_id: state.user.id, cliente: f.cliente, contato: f.contato, endereco: f.endereco,
+      prazo: f.prazo, garantia: f.garantia, forma_pagamento: f.formaPagamento,
+      observacoes: f.observacoes, status: "rascunho",
+    })
+    .select()
+    .single();
+
+  if (error) { alert("Erro ao salvar orçamento: " + error.message); return; }
+
+  const itensValidos = f.itens.filter((it) => it.descricao.trim());
+  if (itensValidos.length) {
+    const { error: errItens } = await sb.from("itens_orcamento").insert(
+      itensValidos.map((it, i) => ({
+        orcamento_id: orcamentoInserido.id, descricao: it.descricao, unidade: it.unidade,
+        quantidade: Number(it.quantidade || 0), valor_unitario: Number(it.valorUnitario || 0), ordem: i,
+      }))
+    );
+    if (errItens) alert("Orçamento salvo, mas houve erro ao salvar os itens: " + errItens.message);
+  }
+
+  await carregarDados();
+  state.view = "lista";
+  renderPage();
+}
+
+async function salvarConfigSupabase(c) {
+  const { error } = await sb.from("configuracoes_padrao").upsert({
+    usuario_id: state.user.id, garantia_padrao: c.garantia, forma_pagamento_padrao: c.formaPagamento,
+  });
+  if (error) { alert("Erro ao salvar configurações: " + error.message); return; }
+  state.config = { ...c };
+  state.view = "lista";
+  renderPage();
+}
+
+/* ========================================================================
+   AUTENTICAÇÃO
+   ======================================================================== */
+async function entrarComEmailSenha(email, senha) {
+  const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+  if (error) mostrarErroAuth(error.message);
+}
+async function cadastrarComEmailSenha(email, senha) {
+  const { error } = await sb.auth.signUp({ email, password: senha });
+  if (error) mostrarErroAuth(error.message);
+  else mostrarErroAuth("Conta criada! Verifique seu e-mail para confirmar antes de entrar.", true);
+}
+async function entrarComGoogle() {
+  await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname } });
+}
+async function sair() { await sb.auth.signOut(); }
+
+function mostrarErroAuth(msg, ok) {
+  const box = document.getElementById("auth-error");
+  if (!box) return;
+  box.textContent = msg;
+  box.style.display = "block";
+  if (ok) { box.style.background = "var(--approved-soft)"; box.style.color = "var(--approved)"; box.style.borderColor = "var(--approved)"; }
+}
+
+/* ========================================================================
+   RENDER: TELA DE LOGIN
+   ======================================================================== */
+function renderAuthShell() {
+  document.getElementById("root").innerHTML = `
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <div class="brand-mark">${ICON.ruler}</div>
+          <div>
+            <div class="brand-text">Orçamento de Obra</div>
+            <div class="brand-sub">medir · orçar · construir</div>
+          </div>
+        </div>
+        <div class="auth-tabs">
+          <button class="auth-tab ${state.authMode === "entrar" ? "active" : ""}" data-action="auth-tab" data-mode="entrar">Entrar</button>
+          <button class="auth-tab ${state.authMode === "cadastrar" ? "active" : ""}" data-action="auth-tab" data-mode="cadastrar">Criar conta</button>
+        </div>
+        <div id="auth-error" class="auth-error" style="display:none;"></div>
+        <div class="field" style="margin-bottom:12px;">
+          <label>E-mail</label>
+          <input id="auth-email" type="email" placeholder="voce@email.com" />
+        </div>
+        <div class="field" style="margin-bottom:16px;">
+          <label>Senha</label>
+          <input id="auth-senha" type="password" placeholder="••••••••" />
+        </div>
+        <button class="btn btn-primary btn-block" data-action="${state.authMode === "entrar" ? "entrar" : "cadastrar"}">
+          ${state.authMode === "entrar" ? "Entrar" : "Criar conta"}
+        </button>
+        <div class="auth-divider">ou</div>
+        <button class="btn btn-ghost btn-block" data-action="google-login">${ICON.google} Continuar com Google</button>
+      </div>
+    </div>
+  `;
+}
+
+/* ============ RENDER: SHELL DO APP (pós-login) ============ */
+function renderShell() {
+  document.getElementById("root").innerHTML = `
+    <div class="app-shell">
+      <div class="ruler">${Array.from({ length: 8 }).map((_, i) => `<div class="ruler-mark"><span>${i * 10} m</span></div>`).join("")}</div>
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-mark">${ICON.ruler}</div>
+          <div>
+            <div class="brand-text">Orçamento de Obra</div>
+            <div class="brand-sub">medir · orçar · construir</div>
+          </div>
+        </div>
+        <div class="user-chip">
+          <button class="icon-btn" data-action="nav-config" title="Configurações padrão">${ICON.settings}</button>
+          <div class="user-avatar">${ICON.user}</div>
+          <span>${state.user?.email || ""}</span>
+          <button class="icon-btn" data-action="sair" title="Sair">${ICON.logout}</button>
+        </div>
+      </header>
+      <div class="container" id="page-container"><div class="loading-text">Carregando seus orçamentos...</div></div>
+    </div>
+  `;
+}
+
+/* ============ RENDER: PÁGINA (por view) ============ */
+function renderPage() {
+  const el = document.getElementById("page-container");
+  if (state.view === "lista") el.innerHTML = viewLista();
+  else if (state.view === "form") el.innerHTML = viewForm();
+  else if (state.view === "detalhe") el.innerHTML = viewDetalhe();
+  else if (state.view === "config") el.innerHTML = viewConfig();
+}
+
+function viewLista() {
+  return `
+    <div class="page-header">
+      <div>
+        <div class="page-title-eyebrow">Meus orçamentos</div>
+        <div class="page-title">${state.orcamentos.length} orçamento${state.orcamentos.length !== 1 ? "s" : ""}</div>
+      </div>
+      <button class="btn btn-primary" data-action="nav-novo">${ICON.plus} Novo orçamento</button>
+    </div>
+    <div class="search-row">
+      <div class="search-box">${ICON.search}<input id="busca-input" placeholder="Buscar por cliente ou endereço..." value="${state.busca}" /></div>
+    </div>
+    <div id="grid-container">${gridHTML()}</div>
+  `;
+}
+
+function gridHTML() {
+  const q = state.busca.trim().toLowerCase();
+  const filtrados = q ? state.orcamentos.filter((o) => o.cliente.toLowerCase().includes(q) || o.endereco.toLowerCase().includes(q)) : state.orcamentos;
+  if (filtrados.length === 0) return `<div class="empty-state">${ICON.file}<div style="margin-top:10px;">Nenhum orçamento encontrado. Comece criando um novo.</div></div>`;
+  return `<div class="card-grid">
+    ${filtrados.map((o) => `
+      <div class="obra-card" data-action="abrir-detalhe" data-id="${o.id}">
+        <div class="obra-card-top">
+          <div><div class="obra-cliente">${o.cliente}</div><div class="obra-meta">${ICON.pin} ${o.endereco || ""}</div></div>
+          <span class="stamp stamp-${o.status}">${STATUS_LABEL[o.status]}</span>
+        </div>
+        <div class="obra-valor">${formatBRL(totalItens(o.itens))}</div>
+        <div class="obra-footer"><span>${ICON.calendar} ${o.prazo || "-"}</span><span>${o.criadoEm}</span></div>
+      </div>`).join("")}
+  </div>`;
+}
+
+function viewForm() {
+  const f = state.form;
+  return `
+    <div class="page-header">
+      <div><div class="page-title-eyebrow">Novo orçamento</div><div class="page-title">Ficha de obra</div></div>
+      <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
+    </div>
+    <div class="form-section">
+      <div class="form-eyebrow">01 · Cliente e obra</div>
+      <div class="field-grid">
+        <div class="field"><label>Nome do cliente</label><input data-field="cliente" value="${f.cliente}" placeholder="Ex: Marcos Andrade" /></div>
+        <div class="field"><label>Contato</label><input data-field="contato" value="${f.contato}" placeholder="Telefone ou e-mail" /></div>
+        <div class="field full"><label>Endereço da obra</label><input data-field="endereco" value="${f.endereco}" placeholder="Rua, número, bairro" /></div>
+        <div class="field"><label>Prazo de execução</label><input data-field="prazo" value="${f.prazo}" placeholder="Ex: 45 dias" /></div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-eyebrow">02 · Itens do orçamento</div>
+      <table class="items-table">
+        <thead><tr><th class="col-desc">Descrição</th><th class="col-un">Unidade</th><th class="col-qtd">Qtd.</th><th class="col-val">Valor unit.</th><th class="col-tot">Total</th><th style="width:34px"></th></tr></thead>
+        <tbody id="itens-body">${f.itens.map(itemRowHTML).join("")}</tbody>
+      </table>
+      <div style="margin-top:10px;"><button class="btn btn-ghost btn-sm" data-action="adicionar-item">${ICON.plus} Adicionar item</button></div>
+      <div class="totals-bar"><span style="font-size:13px;color:var(--ink-soft);">Valor total do orçamento</span><span class="totals-value" id="form-total">${formatBRL(totalItens(f.itens))}</span></div>
+    </div>
+    <div class="form-section">
+      <div class="form-eyebrow">03 · Condições</div>
+      <div class="field-grid">
+        <div class="field"><label>Garantia</label><input data-field="garantia" value="${f.garantia}" /></div>
+        <div class="field"><label>Forma de pagamento</label><input data-field="formaPagamento" value="${f.formaPagamento}" /></div>
+        <div class="field full"><label>Observações</label><textarea data-field="observacoes" placeholder="Detalhes adicionais...">${f.observacoes}</textarea></div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" data-action="nav-lista">Cancelar</button>
+      <button class="btn btn-primary" data-action="salvar-orcamento">Salvar orçamento</button>
+    </div>
+  `;
+}
+
+function itemRowHTML(it) {
+  return `
+    <tr data-item-id="${it.id}">
+      <td><input data-item-field="descricao" value="${it.descricao}" placeholder="Ex: Piso porcelanato 60x60" /></td>
+      <td><select data-item-field="unidade">${UNIDADES.map((u) => `<option value="${u}" ${u === it.unidade ? "selected" : ""}>${u}</option>`).join("")}</select></td>
+      <td><input class="num" type="number" data-item-field="quantidade" value="${it.quantidade}" placeholder="0" /></td>
+      <td><input class="num" type="number" data-item-field="valorUnitario" value="${it.valorUnitario}" placeholder="0,00" /></td>
+      <td class="num" data-item-total>${formatBRL(Number(it.quantidade || 0) * Number(it.valorUnitario || 0))}</td>
+      <td><button class="icon-btn" data-action="remover-item" data-id="${it.id}" title="Remover item" style="border-color:var(--brick);color:var(--brick);">${ICON.trash}</button></td>
+    </tr>`;
+}
+
+function viewDetalhe() {
+  const o = state.orcamentos.find((x) => x.id === state.selectedId);
+  if (!o) return `<div class="empty-state">Orçamento não encontrado.</div>`;
+  return `
+    <div class="page-header">
+      <div><div class="page-title-eyebrow">Orçamento</div><div class="page-title">Ficha de obra</div></div>
+      <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
+    </div>
+    <div class="detail-sheet">
+      <div class="detail-top">
+        <div>
+          <div class="detail-cliente">${o.cliente}</div>
+          <div class="detail-info">
+            <span>${ICON.pin} ${o.endereco || "-"}</span>
+            <span>${ICON.calendar} Prazo de execução: ${o.prazo || "-"}</span>
+            ${o.contato ? `<span>Contato: ${o.contato}</span>` : ""}
+          </div>
+        </div>
+        <span class="stamp stamp-${o.status}">${STATUS_LABEL[o.status]}</span>
+      </div>
+      <div class="detail-block-title">Itens do orçamento</div>
+      <table class="items-table">
+        <thead><tr><th class="col-desc">Descrição</th><th class="col-un">Unidade</th><th class="col-qtd">Qtd.</th><th class="col-val">Valor unit.</th><th class="col-tot">Total</th></tr></thead>
+        <tbody>${o.itens.map((it) => `<tr><td>${it.descricao}</td><td>${it.unidade}</td><td class="num">${it.quantidade}</td><td class="num">${formatBRL(it.valorUnitario)}</td><td class="num">${formatBRL(it.quantidade * it.valorUnitario)}</td></tr>`).join("")}</tbody>
+      </table>
+      <div class="totals-bar"><span style="font-size:13px;color:var(--ink-soft);">Valor total do orçamento</span><span class="totals-value">${formatBRL(totalItens(o.itens))}</span></div>
+      <div class="detail-block-title">Condições</div>
+      <div class="condicoes-grid">
+        <div class="condicao-item"><strong>Garantia</strong>${o.garantia || "-"}</div>
+        <div class="condicao-item"><strong>Forma de pagamento</strong>${o.formaPagamento || "-"}</div>
+        ${o.observacoes ? `<div class="condicao-item" style="grid-column:1/-1;"><strong>Observações</strong>${o.observacoes}</div>` : ""}
+      </div>
+      <div class="form-actions" style="margin-top:22px;">
+        <button class="btn btn-ghost" title="Em breve">${ICON.download} Exportar PDF</button>
+        <button class="btn btn-primary" data-action="editar-em-breve">${ICON.pencil} Editar orçamento</button>
+      </div>
+    </div>`;
+}
+
+function viewConfig() {
+  const c = state.configDraft;
+  return `
+    <div class="page-header">
+      <div><div class="page-title-eyebrow">Configurações</div><div class="page-title">Valores padrão</div></div>
+      <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
+    </div>
+    <div class="form-section">
+      <div class="form-eyebrow">Preenchidos automaticamente em novos orçamentos</div>
+      <div class="field-grid">
+        <div class="field"><label>Garantia padrão</label><input data-config-field="garantia" value="${c.garantia}" /></div>
+        <div class="field"><label>Forma de pagamento padrão</label><input data-config-field="formaPagamento" value="${c.formaPagamento}" /></div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-ghost" data-action="nav-lista">Cancelar</button>
+      <button class="btn btn-primary" data-action="salvar-config">Salvar configurações</button>
+    </div>`;
+}
+
+/* ============ EVENTOS ============ */
+document.addEventListener("click", async (e) => {
+  const el = e.target.closest("[data-action]");
+  if (!el) return;
+  const action = el.dataset.action;
+  const id = el.dataset.id;
+
+  if (action === "auth-tab") { state.authMode = el.dataset.mode; renderAuthShell(); }
+  else if (action === "entrar") {
+    const email = document.getElementById("auth-email").value.trim();
+    const senha = document.getElementById("auth-senha").value;
+    await entrarComEmailSenha(email, senha);
+  }
+  else if (action === "cadastrar") {
+    const email = document.getElementById("auth-email").value.trim();
+    const senha = document.getElementById("auth-senha").value;
+    await cadastrarComEmailSenha(email, senha);
+  }
+  else if (action === "google-login") await entrarComGoogle();
+  else if (action === "sair") await sair();
+  else if (action === "nav-lista") { state.view = "lista"; renderPage(); }
+  else if (action === "nav-novo") { state.form = novoForm(); state.view = "form"; renderPage(); }
+  else if (action === "nav-config") { state.configDraft = { ...state.config }; state.view = "config"; renderPage(); }
+  else if (action === "abrir-detalhe") { state.selectedId = id; state.view = "detalhe"; renderPage(); }
+  else if (action === "adicionar-item") { state.form.itens.push(novoItem()); renderPage(); }
+  else if (action === "remover-item") { state.form.itens = state.form.itens.filter((it) => it.id !== id); renderPage(); }
+  else if (action === "editar-em-breve") alert("Edição de orçamentos existentes ainda não está disponível neste protótipo.");
+  else if (action === "salvar-orcamento") await salvarOrcamentoSupabase(state.form);
+  else if (action === "salvar-config") await salvarConfigSupabase(state.configDraft);
+});
+
+document.addEventListener("input", (e) => {
+  if (e.target.id === "busca-input") {
+    state.busca = e.target.value;
+    document.getElementById("grid-container").innerHTML = gridHTML();
+    return;
+  }
+  if (e.target.dataset.field && state.form) { state.form[e.target.dataset.field] = e.target.value; return; }
+  if (e.target.dataset.configField && state.configDraft) { state.configDraft[e.target.dataset.configField] = e.target.value; return; }
+
+  const row = e.target.closest("[data-item-id]");
+  if (row && e.target.dataset.itemField) {
+    const item = state.form.itens.find((it) => it.id === row.dataset.itemId);
+    if (!item) return;
+    item[e.target.dataset.itemField] = e.target.value;
+    if (["quantidade", "valorUnitario"].includes(e.target.dataset.itemField)) {
+      row.querySelector("[data-item-total]").textContent = formatBRL(Number(item.quantidade || 0) * Number(item.valorUnitario || 0));
+      document.getElementById("form-total").textContent = formatBRL(totalItens(state.form.itens));
+    }
+  }
+});
+
+document.addEventListener("change", (e) => {
+  const row = e.target.closest("[data-item-id]");
+  if (row && e.target.dataset.itemField === "unidade") {
+    const item = state.form.itens.find((it) => it.id === row.dataset.itemId);
+    if (item) item.unidade = e.target.value;
+  }
+});
+
+/* ============ INICIALIZAÇÃO ============ */
+async function afterLogin() {
+  renderShell();
+  await carregarDados();
+  state.view = "lista";
+  renderPage();
+}
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) await afterLogin();
+  else renderAuthShell();
+
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN") afterLogin();
+    if (event === "SIGNED_OUT") { state.orcamentos = []; state.view = "lista"; renderAuthShell(); }
+  });
+}
+
+init();
+</script>
+
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("/service-worker.js").catch((erro) => console.warn("Service worker não registrado:", erro.message));
+    });
+  }
+</script>
+</body>
+</html>
