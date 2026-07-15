@@ -99,8 +99,11 @@
   .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 
   .detail-sheet { background: var(--card-bg); border: 1.5px solid var(--ink); border-radius: 8px; padding: 26px 28px; }
-  .detail-logo { max-height: 110px; max-width: 320px; object-fit: contain; margin-bottom: 20px; }
-  .detail-top { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 16px; gap: 14px; flex-wrap: wrap; }
+  .detail-logo { max-height: 110px; max-width: 320px; object-fit: contain; }
+  .detail-header-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+  .detail-header-logo { flex-shrink: 0; }
+  .detail-header-cliente { text-align: right; flex: 1; min-width: 220px; }
+  .detail-header-cliente .detail-info { align-items: flex-end; }
   .detail-cliente { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 22px; }
   .detail-info { font-size: 13px; color: var(--ink-soft); margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
   .detail-block-title { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--blueprint); margin: 18px 0 8px; }
@@ -573,9 +576,11 @@ function viewDetalhe() {
       <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
     </div>
     <div class="detail-sheet">
-      ${state.config.logoUrl ? `<img class="detail-logo" src="${state.config.logoUrl}" alt="Logo da empresa" />` : ""}
-      <div class="detail-top">
-        <div>
+      <div class="detail-header-row">
+        <div class="detail-header-logo">
+          ${state.config.logoUrl ? `<img class="detail-logo" src="${state.config.logoUrl}" alt="Logo da empresa" />` : ""}
+        </div>
+        <div class="detail-header-cliente">
           <div class="detail-cliente">${o.cliente}</div>
           <div class="detail-info">
             <span>${ICON.pin} ${o.endereco || "-"}</span>
@@ -583,13 +588,13 @@ function viewDetalhe() {
             ${o.contato ? `<span>Contato: ${o.contato}</span>` : ""}
           </div>
         </div>
-        <div class="no-print">
-          <span class="stamp stamp-${o.status}">${STATUS_LABEL[o.status]}</span>
-          <div class="status-controle" style="margin-top:8px;">
-            <select id="status-select" data-id="${o.id}">
-              ${Object.keys(STATUS_LABEL).map((s) => `<option value="${s}" ${s === o.status ? "selected" : ""}>${STATUS_LABEL[s]}</option>`).join("")}
-            </select>
-          </div>
+      </div>
+      <div class="no-print" style="margin-bottom:16px;">
+        <span class="stamp stamp-${o.status}">${STATUS_LABEL[o.status]}</span>
+        <div class="status-controle" style="margin-top:8px;">
+          <select id="status-select" data-id="${o.id}">
+            ${Object.keys(STATUS_LABEL).map((s) => `<option value="${s}" ${s === o.status ? "selected" : ""}>${STATUS_LABEL[s]}</option>`).join("")}
+          </select>
         </div>
       </div>
       <div class="detail-block-title">Itens do orçamento</div>
