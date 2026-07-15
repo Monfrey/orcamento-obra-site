@@ -8,6 +8,8 @@
 <link rel="manifest" href="/manifest.json" />
 <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Archivo+Expanded:wght@700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
@@ -27,13 +29,15 @@
 
   .topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 28px; border-bottom: 2px solid var(--ink); background: var(--paper); }
   .brand { display: flex; align-items: center; gap: 10px; }
-  .brand-mark { width: 34px; height: 34px; background: var(--blueprint); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff; }
+  .brand-mark { width: 34px; height: 34px; background: var(--blueprint); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff; overflow: hidden; }
+  .brand-mark img { width: 100%; height: 100%; object-fit: cover; }
   .brand-text { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 19px; letter-spacing: -0.01em; line-height: 1; }
   .brand-sub { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; color: var(--ink-soft); letter-spacing: 0.08em; text-transform: uppercase; }
   .user-chip { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); }
   .user-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--tape-soft); border: 1.5px solid var(--tape); display: flex; align-items: center; justify-content: center; color: var(--ink); }
   .icon-btn { background: transparent; border: 1.5px solid var(--ink); border-radius: 6px; padding: 7px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ink); transition: background 0.15s ease, color 0.15s ease; }
   .icon-btn:hover { background: var(--ink); color: var(--paper); }
+  .icon-btn:disabled { opacity: 0.4; cursor: wait; }
 
   .container { max-width: 980px; margin: 0 auto; padding: 32px 28px 80px; }
   .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
@@ -63,7 +67,7 @@
   .obra-valor { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 18px; margin-top: 12px; }
   .obra-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 11.5px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; }
 
-  .stamp { font-family: 'Archivo Expanded', sans-serif; font-size: 10.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 9px; border-radius: 4px; border: 2px solid; white-space: nowrap; }
+  .stamp { font-family: 'Archivo Expanded', sans-serif; font-size: 10.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 4px 9px; border-radius: 4px; border: 2px solid; white-space: nowrap; display: inline-block; }
   .stamp-rascunho { color: var(--ink-soft); border-color: var(--paper-line); border-style: dashed; transform: rotate(-2deg); }
   .stamp-enviado { color: var(--blueprint); border-color: var(--blueprint); transform: rotate(2deg); }
   .stamp-aprovado { color: var(--approved); border-color: var(--approved); background: var(--approved-soft); transform: rotate(-3deg); }
@@ -80,6 +84,7 @@
   .field input, .field select, .field textarea { border: 1.5px solid var(--paper-line); border-radius: 5px; padding: 9px 10px; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; color: var(--ink); background: #fff; outline: none; width: 100%; }
   .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--blueprint); }
   .field textarea { resize: vertical; min-height: 70px; }
+  .field-hint { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
 
   .items-table { width: 100%; border-collapse: collapse; }
   .items-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); font-weight: 600; padding: 6px 8px; border-bottom: 1.5px solid var(--ink); }
@@ -94,25 +99,29 @@
   .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 
   .detail-sheet { background: var(--card-bg); border: 1.5px solid var(--ink); border-radius: 8px; padding: 26px 28px; }
-  .detail-top { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 16px; }
+  .detail-logo { max-height: 56px; max-width: 220px; object-fit: contain; margin-bottom: 16px; }
+  .detail-top { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 16px; gap: 14px; flex-wrap: wrap; }
   .detail-cliente { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 22px; }
   .detail-info { font-size: 13px; color: var(--ink-soft); margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
   .detail-block-title { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--blueprint); margin: 18px 0 8px; }
   .condicoes-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
   .condicao-item { font-size: 14px; }
   .condicao-item strong { display: block; font-size: 11.5px; color: var(--ink-soft); font-weight: 600; margin-bottom: 2px; }
+  .status-controle { display: flex; align-items: center; gap: 8px; }
+  .status-controle select { border: 1.5px solid var(--paper-line); border-radius: 5px; padding: 6px 8px; font-family: 'IBM Plex Sans', sans-serif; font-size: 12.5px; }
+
+  .logo-preview-box { display: flex; align-items: center; gap: 16px; }
+  .logo-preview-frame { width: 96px; height: 96px; border: 1.5px dashed var(--paper-line); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #fff; flex-shrink: 0; }
+  .logo-preview-frame img { max-width: 100%; max-height: 100%; object-fit: contain; }
 
   svg.i { width: 15px; height: 15px; flex-shrink: 0; }
 
-  /* Tela de login */
   .auth-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
   .auth-card { background: var(--card-bg); border: 1.5px solid var(--ink); border-radius: 10px; padding: 32px 28px; width: 100%; max-width: 380px; box-shadow: 4px 4px 0 var(--shadow); }
   .auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; justify-content: center; }
   .auth-tabs { display: flex; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; margin-bottom: 18px; }
   .auth-tab { flex: 1; text-align: center; padding: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; border: none; color: var(--ink-soft); }
   .auth-tab.active { background: var(--blueprint); color: #fff; }
-  .auth-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; font-size: 11.5px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.06em; }
-  .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--paper-line); }
   .auth-error { background: var(--brick-soft); color: var(--brick); border: 1px solid var(--brick); border-radius: 5px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 12px; }
   .loading-text { text-align: center; padding: 60px 20px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
 
@@ -149,7 +158,6 @@ const ICON = {
   user: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`,
   file: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
   logout: `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`,
-  google: `<svg class="i" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.85A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.09A6.6 6.6 0 0 1 5.5 12c0-.73.12-1.43.34-2.09V7.06H2.18A11 11 0 0 0 1 12c0 1.77.42 3.45 1.18 4.94z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.82 6.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>`,
 };
 
 const UNIDADES = ["m²", "m³", "m", "kg", "un", "verba", "h"];
@@ -163,11 +171,14 @@ const state = {
   authMode: "entrar",
   busca: "",
   selectedId: null,
+  editingId: null,
   user: null,
-  config: { garantia: "12 meses", formaPagamento: "40% entrada + saldo na entrega" },
+  config: { garantia: "12 meses", formaPagamento: "40% entrada + saldo na entrega", logoUrl: null },
   orcamentos: [],
   form: null,
   configDraft: null,
+  enviandoLogo: false,
+  exportando: false,
 };
 
 const novoItem = () => ({ id: uid("i"), descricao: "", unidade: "m²", quantidade: "", valorUnitario: "" });
@@ -205,7 +216,7 @@ async function carregarDados() {
     .maybeSingle();
 
   if (configData) {
-    state.config = { garantia: configData.garantia_padrao, formaPagamento: configData.forma_pagamento_padrao };
+    state.config = { garantia: configData.garantia_padrao, formaPagamento: configData.forma_pagamento_padrao, logoUrl: configData.logo_url || null };
   } else {
     await sb.from("configuracoes_padrao").insert({
       usuario_id: user.id,
@@ -217,27 +228,52 @@ async function carregarDados() {
 
 async function salvarOrcamentoSupabase(f) {
   if (!f.cliente.trim()) { alert("Informe o nome do cliente antes de salvar."); return; }
-  const { data: orcamentoInserido, error } = await sb
-    .from("orcamentos")
-    .insert({
-      usuario_id: state.user.id, cliente: f.cliente, contato: f.contato, endereco: f.endereco,
-      prazo: f.prazo, garantia: f.garantia, forma_pagamento: f.formaPagamento,
-      observacoes: f.observacoes, status: "rascunho",
-    })
-    .select()
-    .single();
-
-  if (error) { alert("Erro ao salvar orçamento: " + error.message); return; }
-
   const itensValidos = f.itens.filter((it) => it.descricao.trim());
-  if (itensValidos.length) {
-    const { error: errItens } = await sb.from("itens_orcamento").insert(
-      itensValidos.map((it, i) => ({
-        orcamento_id: orcamentoInserido.id, descricao: it.descricao, unidade: it.unidade,
-        quantidade: Number(it.quantidade || 0), valor_unitario: Number(it.valorUnitario || 0), ordem: i,
-      }))
-    );
-    if (errItens) alert("Orçamento salvo, mas houve erro ao salvar os itens: " + errItens.message);
+
+  if (state.editingId) {
+    // ---- Atualizar orçamento existente ----
+    const { error } = await sb.from("orcamentos").update({
+      cliente: f.cliente, contato: f.contato, endereco: f.endereco, prazo: f.prazo,
+      garantia: f.garantia, forma_pagamento: f.formaPagamento, observacoes: f.observacoes,
+    }).eq("id", state.editingId);
+    if (error) { alert("Erro ao atualizar orçamento: " + error.message); return; }
+
+    // Estratégia simples: remove todos os itens antigos e grava os atuais
+    const { error: errDelete } = await sb.from("itens_orcamento").delete().eq("orcamento_id", state.editingId);
+    if (errDelete) { alert("Erro ao atualizar itens: " + errDelete.message); return; }
+
+    if (itensValidos.length) {
+      const { error: errItens } = await sb.from("itens_orcamento").insert(
+        itensValidos.map((it, i) => ({
+          orcamento_id: state.editingId, descricao: it.descricao, unidade: it.unidade,
+          quantidade: Number(it.quantidade || 0), valor_unitario: Number(it.valorUnitario || 0), ordem: i,
+        }))
+      );
+      if (errItens) alert("Orçamento atualizado, mas houve erro ao salvar os itens: " + errItens.message);
+    }
+    state.editingId = null;
+  } else {
+    // ---- Criar novo orçamento ----
+    const { data: orcamentoInserido, error } = await sb
+      .from("orcamentos")
+      .insert({
+        usuario_id: state.user.id, cliente: f.cliente, contato: f.contato, endereco: f.endereco,
+        prazo: f.prazo, garantia: f.garantia, forma_pagamento: f.formaPagamento,
+        observacoes: f.observacoes, status: "rascunho",
+      })
+      .select()
+      .single();
+    if (error) { alert("Erro ao salvar orçamento: " + error.message); return; }
+
+    if (itensValidos.length) {
+      const { error: errItens } = await sb.from("itens_orcamento").insert(
+        itensValidos.map((it, i) => ({
+          orcamento_id: orcamentoInserido.id, descricao: it.descricao, unidade: it.unidade,
+          quantidade: Number(it.quantidade || 0), valor_unitario: Number(it.valorUnitario || 0), ordem: i,
+        }))
+      );
+      if (errItens) alert("Orçamento salvo, mas houve erro ao salvar os itens: " + errItens.message);
+    }
   }
 
   await carregarDados();
@@ -245,13 +281,50 @@ async function salvarOrcamentoSupabase(f) {
   renderPage();
 }
 
+async function atualizarStatusSupabase(orcamentoId, novoStatus) {
+  const { error } = await sb.from("orcamentos").update({ status: novoStatus }).eq("id", orcamentoId);
+  if (error) { alert("Erro ao atualizar status: " + error.message); return; }
+  const o = state.orcamentos.find((x) => x.id === orcamentoId);
+  if (o) o.status = novoStatus;
+}
+
 async function salvarConfigSupabase(c) {
   const { error } = await sb.from("configuracoes_padrao").upsert({
     usuario_id: state.user.id, garantia_padrao: c.garantia, forma_pagamento_padrao: c.formaPagamento,
   });
   if (error) { alert("Erro ao salvar configurações: " + error.message); return; }
-  state.config = { ...c };
+  state.config.garantia = c.garantia;
+  state.config.formaPagamento = c.formaPagamento;
   state.view = "lista";
+  renderPage();
+}
+
+async function enviarLogoSupabase(file) {
+  if (!file) return;
+  state.enviandoLogo = true;
+  renderPage();
+
+  const extensao = file.name.split(".").pop() || "png";
+  const caminho = `${state.user.id}/logo.${extensao}`;
+
+  const { error: errUpload } = await sb.storage.from("logos").upload(caminho, file, { upsert: true, cacheControl: "3600" });
+  if (errUpload) {
+    alert("Erro ao enviar a logo: " + errUpload.message + "\n\nVerifique se o bucket 'logos' foi criado no Supabase (veja o SQL fornecido).");
+    state.enviandoLogo = false;
+    renderPage();
+    return;
+  }
+
+  const { data: publicData } = sb.storage.from("logos").getPublicUrl(caminho);
+  const urlComVersao = `${publicData.publicUrl}?v=${Date.now()}`;
+
+  const { error: errSalvar } = await sb.from("configuracoes_padrao").upsert({
+    usuario_id: state.user.id, garantia_padrao: state.config.garantia, forma_pagamento_padrao: state.config.formaPagamento, logo_url: urlComVersao,
+  });
+  if (errSalvar) { alert("Logo enviada, mas houve erro ao salvar a referência: " + errSalvar.message); }
+  else state.config.logoUrl = urlComVersao;
+
+  state.enviandoLogo = false;
   renderPage();
 }
 
@@ -265,20 +338,8 @@ async function entrarComEmailSenha(email, senha) {
 async function cadastrarComEmailSenha(email, senha) {
   const { data, error } = await sb.auth.signUp({ email, password: senha });
   if (error) { mostrarErroAuth(error.message); return; }
-
-  if (data.session) {
-    // Confirmação de e-mail está desativada no projeto: o Supabase já libera
-    // a sessão na hora. Não faz sentido mostrar "verifique seu e-mail" aqui —
-    // o próprio onAuthStateChange (SIGNED_IN) vai levar direto para o app.
-    return;
-  }
-
-  // Confirmação de e-mail está ativada: a conta foi criada, mas ainda não há
-  // sessão até a pessoa clicar no link recebido por e-mail.
+  if (data.session) return; // confirmação de e-mail desativada: já entra direto
   mostrarErroAuth("Conta criada! Verifique seu e-mail para confirmar antes de entrar.", true);
-}
-async function entrarComGoogle() {
-  await sb.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin + window.location.pathname } });
 }
 async function sair() { await sb.auth.signOut(); }
 
@@ -288,6 +349,40 @@ function mostrarErroAuth(msg, ok) {
   box.textContent = msg;
   box.style.display = "block";
   if (ok) { box.style.background = "var(--approved-soft)"; box.style.color = "var(--approved)"; box.style.borderColor = "var(--approved)"; }
+}
+
+/* ========================================================================
+   EXPORTAÇÃO EM PDF
+   ======================================================================== */
+async function exportarPDF(orcamentoId) {
+  const o = state.orcamentos.find((x) => x.id === orcamentoId);
+  if (!o) return;
+  const elemento = document.querySelector(".detail-sheet");
+  if (!elemento) return;
+
+  state.exportando = true;
+  renderPage();
+
+  try {
+    const canvas = await html2canvas(elemento, {
+      scale: 2,
+      backgroundColor: "#FBFCFA",
+      ignoreElements: (el) => el.classList.contains("no-print"),
+    });
+    const imgData = canvas.toDataURL("image/png");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "pt", format: "a4" });
+    const largura = pdf.internal.pageSize.getWidth() - 80;
+    const altura = (canvas.height * largura) / canvas.width;
+    pdf.addImage(imgData, "PNG", 40, 40, largura, altura);
+    const nomeArquivo = `orcamento-${(o.cliente || "obra").trim().toLowerCase().replace(/\s+/g, "-")}.pdf`;
+    pdf.save(nomeArquivo);
+  } catch (e) {
+    alert("Não foi possível gerar o PDF: " + e.message);
+  }
+
+  state.exportando = false;
+  renderPage();
 }
 
 /* ========================================================================
@@ -320,8 +415,6 @@ function renderAuthShell() {
         <button class="btn btn-primary btn-block" data-action="${state.authMode === "entrar" ? "entrar" : "cadastrar"}">
           ${state.authMode === "entrar" ? "Entrar" : "Criar conta"}
         </button>
-        <div class="auth-divider">ou</div>
-        <button class="btn btn-ghost btn-block" data-action="google-login">${ICON.google} Continuar com Google</button>
       </div>
     </div>
   `;
@@ -334,14 +427,14 @@ function renderShell() {
       <div class="ruler">${Array.from({ length: 8 }).map((_, i) => `<div class="ruler-mark"><span>${i * 10} m</span></div>`).join("")}</div>
       <header class="topbar">
         <div class="brand">
-          <div class="brand-mark">${ICON.ruler}</div>
+          <div class="brand-mark">${state.config.logoUrl ? `<img src="${state.config.logoUrl}" alt="Logo" />` : ICON.ruler}</div>
           <div>
             <div class="brand-text">Orçamento de Obra</div>
             <div class="brand-sub">medir · orçar · construir</div>
           </div>
         </div>
         <div class="user-chip">
-          <button class="icon-btn" data-action="nav-config" title="Configurações padrão">${ICON.settings}</button>
+          <button class="icon-btn" data-action="nav-config" title="Configurações">${ICON.settings}</button>
           <div class="user-avatar">${ICON.user}</div>
           <span>${state.user?.email || ""}</span>
           <button class="icon-btn" data-action="sair" title="Sair">${ICON.logout}</button>
@@ -355,6 +448,7 @@ function renderShell() {
 /* ============ RENDER: PÁGINA (por view) ============ */
 function renderPage() {
   const el = document.getElementById("page-container");
+  if (!el) return;
   if (state.view === "lista") el.innerHTML = viewLista();
   else if (state.view === "form") el.innerHTML = viewForm();
   else if (state.view === "detalhe") el.innerHTML = viewDetalhe();
@@ -379,7 +473,7 @@ function viewLista() {
 
 function gridHTML() {
   const q = state.busca.trim().toLowerCase();
-  const filtrados = q ? state.orcamentos.filter((o) => o.cliente.toLowerCase().includes(q) || o.endereco.toLowerCase().includes(q)) : state.orcamentos;
+  const filtrados = q ? state.orcamentos.filter((o) => o.cliente.toLowerCase().includes(q) || (o.endereco || "").toLowerCase().includes(q)) : state.orcamentos;
   if (filtrados.length === 0) return `<div class="empty-state">${ICON.file}<div style="margin-top:10px;">Nenhum orçamento encontrado. Comece criando um novo.</div></div>`;
   return `<div class="card-grid">
     ${filtrados.map((o) => `
@@ -396,9 +490,13 @@ function gridHTML() {
 
 function viewForm() {
   const f = state.form;
+  const editando = !!state.editingId;
   return `
     <div class="page-header">
-      <div><div class="page-title-eyebrow">Novo orçamento</div><div class="page-title">Ficha de obra</div></div>
+      <div>
+        <div class="page-title-eyebrow">${editando ? "Editar orçamento" : "Novo orçamento"}</div>
+        <div class="page-title">Ficha de obra</div>
+      </div>
       <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
     </div>
     <div class="form-section">
@@ -429,7 +527,7 @@ function viewForm() {
     </div>
     <div class="form-actions">
       <button class="btn btn-ghost" data-action="nav-lista">Cancelar</button>
-      <button class="btn btn-primary" data-action="salvar-orcamento">Salvar orçamento</button>
+      <button class="btn btn-primary" data-action="salvar-orcamento">${editando ? "Salvar alterações" : "Salvar orçamento"}</button>
     </div>
   `;
 }
@@ -455,6 +553,7 @@ function viewDetalhe() {
       <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
     </div>
     <div class="detail-sheet">
+      ${state.config.logoUrl ? `<img class="detail-logo" src="${state.config.logoUrl}" alt="Logo da empresa" />` : ""}
       <div class="detail-top">
         <div>
           <div class="detail-cliente">${o.cliente}</div>
@@ -464,7 +563,14 @@ function viewDetalhe() {
             ${o.contato ? `<span>Contato: ${o.contato}</span>` : ""}
           </div>
         </div>
-        <span class="stamp stamp-${o.status}">${STATUS_LABEL[o.status]}</span>
+        <div>
+          <span class="stamp stamp-${o.status}">${STATUS_LABEL[o.status]}</span>
+          <div class="status-controle no-print" style="margin-top:8px;">
+            <select id="status-select" data-id="${o.id}">
+              ${Object.keys(STATUS_LABEL).map((s) => `<option value="${s}" ${s === o.status ? "selected" : ""}>${STATUS_LABEL[s]}</option>`).join("")}
+            </select>
+          </div>
+        </div>
       </div>
       <div class="detail-block-title">Itens do orçamento</div>
       <table class="items-table">
@@ -478,11 +584,12 @@ function viewDetalhe() {
         <div class="condicao-item"><strong>Forma de pagamento</strong>${o.formaPagamento || "-"}</div>
         ${o.observacoes ? `<div class="condicao-item" style="grid-column:1/-1;"><strong>Observações</strong>${o.observacoes}</div>` : ""}
       </div>
-      <div class="form-actions" style="margin-top:22px;">
-        <button class="btn btn-ghost" title="Em breve">${ICON.download} Exportar PDF</button>
-        <button class="btn btn-primary" data-action="editar-em-breve">${ICON.pencil} Editar orçamento</button>
+      <div class="form-actions no-print" style="margin-top:22px;">
+        <button class="btn btn-ghost" data-action="exportar-pdf" data-id="${o.id}" ${state.exportando ? "disabled" : ""}>${ICON.download} ${state.exportando ? "Gerando PDF..." : "Exportar PDF"}</button>
+        <button class="btn btn-primary" data-action="abrir-edicao" data-id="${o.id}">${ICON.pencil} Editar orçamento</button>
       </div>
-    </div>`;
+    </div>
+  `;
 }
 
 function viewConfig() {
@@ -491,6 +598,18 @@ function viewConfig() {
     <div class="page-header">
       <div><div class="page-title-eyebrow">Configurações</div><div class="page-title">Valores padrão</div></div>
       <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
+    </div>
+    <div class="form-section">
+      <div class="form-eyebrow">Logo da empresa</div>
+      <div class="logo-preview-box">
+        <div class="logo-preview-frame">
+          ${state.config.logoUrl ? `<img src="${state.config.logoUrl}" alt="Logo atual" />` : ICON.file}
+        </div>
+        <div>
+          <input type="file" id="logo-input" accept="image/*" ${state.enviandoLogo ? "disabled" : ""} />
+          <div class="field-hint">${state.enviandoLogo ? "Enviando logo..." : "PNG ou JPG. Aparecerá no cabeçalho do app e nos orçamentos exportados."}</div>
+        </div>
+      </div>
     </div>
     <div class="form-section">
       <div class="form-eyebrow">Preenchidos automaticamente em novos orçamentos</div>
@@ -523,17 +642,28 @@ document.addEventListener("click", async (e) => {
     const senha = document.getElementById("auth-senha").value;
     await cadastrarComEmailSenha(email, senha);
   }
-  else if (action === "google-login") await entrarComGoogle();
   else if (action === "sair") await sair();
   else if (action === "nav-lista") { state.view = "lista"; renderPage(); }
-  else if (action === "nav-novo") { state.form = novoForm(); state.view = "form"; renderPage(); }
-  else if (action === "nav-config") { state.configDraft = { ...state.config }; state.view = "config"; renderPage(); }
+  else if (action === "nav-novo") { state.editingId = null; state.form = novoForm(); state.view = "form"; renderPage(); }
+  else if (action === "nav-config") { state.configDraft = { garantia: state.config.garantia, formaPagamento: state.config.formaPagamento }; state.view = "config"; renderPage(); }
   else if (action === "abrir-detalhe") { state.selectedId = id; state.view = "detalhe"; renderPage(); }
+  else if (action === "abrir-edicao") {
+    const o = state.orcamentos.find((x) => x.id === id);
+    if (!o) return;
+    state.editingId = o.id;
+    state.form = {
+      cliente: o.cliente, contato: o.contato || "", endereco: o.endereco || "", prazo: o.prazo || "",
+      garantia: o.garantia || "", formaPagamento: o.formaPagamento || "", observacoes: o.observacoes || "",
+      itens: o.itens.length ? o.itens.map((it) => ({ ...it })) : [novoItem()],
+    };
+    state.view = "form";
+    renderPage();
+  }
   else if (action === "adicionar-item") { state.form.itens.push(novoItem()); renderPage(); }
   else if (action === "remover-item") { state.form.itens = state.form.itens.filter((it) => it.id !== id); renderPage(); }
-  else if (action === "editar-em-breve") alert("Edição de orçamentos existentes ainda não está disponível neste protótipo.");
   else if (action === "salvar-orcamento") await salvarOrcamentoSupabase(state.form);
   else if (action === "salvar-config") await salvarConfigSupabase(state.configDraft);
+  else if (action === "exportar-pdf") await exportarPDF(id);
 });
 
 document.addEventListener("input", (e) => {
@@ -557,11 +687,20 @@ document.addEventListener("input", (e) => {
   }
 });
 
-document.addEventListener("change", (e) => {
+document.addEventListener("change", async (e) => {
   const row = e.target.closest("[data-item-id]");
   if (row && e.target.dataset.itemField === "unidade") {
     const item = state.form.itens.find((it) => it.id === row.dataset.itemId);
     if (item) item.unidade = e.target.value;
+    return;
+  }
+  if (e.target.id === "status-select") {
+    await atualizarStatusSupabase(e.target.dataset.id, e.target.value);
+    renderPage();
+    return;
+  }
+  if (e.target.id === "logo-input" && e.target.files[0]) {
+    await enviarLogoSupabase(e.target.files[0]);
   }
 });
 
@@ -569,6 +708,7 @@ document.addEventListener("change", (e) => {
 async function afterLogin() {
   renderShell();
   await carregarDados();
+  renderShell(); // atualiza o cabeçalho caso já exista logo salva
   state.view = "lista";
   renderPage();
 }
