@@ -104,6 +104,9 @@
   .detail-header-logo { flex-shrink: 0; }
   .detail-header-cliente { text-align: right; flex: 1; min-width: 220px; }
   .detail-header-cliente .detail-info { align-items: flex-end; }
+  .detail-texto-padrao { font-size: 14px; line-height: 1.6; color: var(--ink); margin: 0 0 4px; white-space: pre-line; }
+  .assinaturas-row { display: flex; justify-content: space-between; gap: 40px; margin-top: 56px; flex-wrap: wrap; }
+  .assinatura-item { flex: 1; min-width: 200px; text-align: center; border-top: 1.5px solid var(--ink); padding-top: 8px; font-size: 12.5px; color: var(--ink-soft); }
   .detail-cliente { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 22px; }
   .detail-info { font-size: 13px; color: var(--ink-soft); margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
   .detail-block-title { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--blueprint); margin: 18px 0 8px; }
@@ -184,7 +187,14 @@ const state = {
   selectedId: null,
   editingId: null,
   user: null,
-  config: { garantia: "12 meses", formaPagamento: "40% entrada + saldo na entrega", logoUrl: null },
+  config: {
+    garantia: "12 meses",
+    formaPagamento: "40% entrada + saldo na entrega",
+    logoUrl: null,
+    objetivo: "Esta proposta tem como finalidade apresentar as condições comerciais e técnicas para a prestação de serviços/fornecimento de produtos conforme solicitado.",
+    escopoServicos: "Desmontagem de forro existente, montagem de novo forro, emassamento e pintura na cor branco neve.",
+    aprovacaoTexto: "Caso esteja de acordo com os termos desta proposta, solicitamos a confirmação para dar andamento ao processo.",
+  },
   orcamentos: [],
   form: null,
   configDraft: null,
@@ -228,12 +238,22 @@ async function carregarDados() {
     .maybeSingle();
 
   if (configData) {
-    state.config = { garantia: configData.garantia_padrao, formaPagamento: configData.forma_pagamento_padrao, logoUrl: configData.logo_url || null };
+    state.config = {
+      garantia: configData.garantia_padrao,
+      formaPagamento: configData.forma_pagamento_padrao,
+      logoUrl: configData.logo_url || null,
+      objetivo: configData.objetivo || state.config.objetivo,
+      escopoServicos: configData.escopo_servicos || state.config.escopoServicos,
+      aprovacaoTexto: configData.aprovacao_texto || state.config.aprovacaoTexto,
+    };
   } else {
     await sb.from("configuracoes_padrao").insert({
       usuario_id: user.id,
       garantia_padrao: state.config.garantia,
       forma_pagamento_padrao: state.config.formaPagamento,
+      objetivo: state.config.objetivo,
+      escopo_servicos: state.config.escopoServicos,
+      aprovacao_texto: state.config.aprovacaoTexto,
     });
   }
 }
@@ -302,11 +322,19 @@ async function atualizarStatusSupabase(orcamentoId, novoStatus) {
 
 async function salvarConfigSupabase(c) {
   const { error } = await sb.from("configuracoes_padrao").upsert({
-    usuario_id: state.user.id, garantia_padrao: c.garantia, forma_pagamento_padrao: c.formaPagamento,
+    usuario_id: state.user.id,
+    garantia_padrao: c.garantia,
+    forma_pagamento_padrao: c.formaPagamento,
+    objetivo: c.objetivo,
+    escopo_servicos: c.escopoServicos,
+    aprovacao_texto: c.aprovacaoTexto,
   });
   if (error) { alert("Erro ao salvar configurações: " + error.message); return; }
   state.config.garantia = c.garantia;
   state.config.formaPagamento = c.formaPagamento;
+  state.config.objetivo = c.objetivo;
+  state.config.escopoServicos = c.escopoServicos;
+  state.config.aprovacaoTexto = c.aprovacaoTexto;
   state.view = "lista";
   renderPage();
 }
@@ -597,7 +625,11 @@ function viewDetalhe() {
           </select>
         </div>
       </div>
-      <div class="detail-block-title">Itens do orçamento</div>
+      <div class="detail-block-title" style="margin-top:0;">Objetivo</div>
+      <p class="detail-texto-padrao">${state.config.objetivo}</p>
+      <div class="detail-block-title">Escopo dos serviços</div>
+      <p class="detail-texto-padrao">${state.config.escopoServicos}</p>
+      <div class="detail-block-title">Dados do orçamento</div>
       <table class="items-table">
         <thead><tr><th class="col-desc">Descrição</th><th class="col-un">Unidade</th><th class="col-qtd">Qtd.</th><th class="col-val">Valor unit.</th><th class="col-tot">Total</th></tr></thead>
         <tbody>${o.itens.map((it) => `<tr><td>${it.descricao}</td><td>${it.unidade}</td><td class="num">${it.quantidade}</td><td class="num">${formatBRL(it.valorUnitario)}</td><td class="num">${formatBRL(it.quantidade * it.valorUnitario)}</td></tr>`).join("")}</tbody>
@@ -608,6 +640,12 @@ function viewDetalhe() {
         <div class="condicao-item"><strong>Garantia</strong>${o.garantia || "-"}</div>
         <div class="condicao-item"><strong>Forma de pagamento</strong>${o.formaPagamento || "-"}</div>
         ${o.observacoes ? `<div class="condicao-item" style="grid-column:1/-1;"><strong>Observações</strong>${o.observacoes}</div>` : ""}
+      </div>
+      <div class="detail-block-title">Aprovação</div>
+      <p class="detail-texto-padrao">${state.config.aprovacaoTexto}</p>
+      <div class="assinaturas-row">
+        <div class="assinatura-item">Assinatura do Cliente</div>
+        <div class="assinatura-item">Assinatura do Responsável</div>
       </div>
       <div class="form-actions no-print" style="margin-top:22px;">
         <button class="btn btn-ghost" data-action="exportar-pdf" data-id="${o.id}" ${state.exportando ? "disabled" : ""}>${ICON.download} ${state.exportando ? "Gerando..." : "Imprimir"}</button>
@@ -697,6 +735,25 @@ function viewConfig() {
       <button class="btn btn-ghost btn-sm" data-action="nav-relatorio">${ICON.file} Ver relatórios</button>
     </div>
     <div class="form-section">
+      <div class="form-eyebrow">Textos padrão do orçamento</div>
+      <p style="font-size:13.5px;color:var(--ink-soft);margin:0 0 12px;">Esses textos aparecem automaticamente em todo orçamento gerado, como complemento aos dados do cliente e dos itens.</p>
+      <div class="field-grid">
+        <div class="field full">
+          <label>Objetivo</label>
+          <textarea data-config-field="objetivo">${c.objetivo}</textarea>
+        </div>
+        <div class="field full">
+          <label>Escopo dos serviços</label>
+          <textarea data-config-field="escopoServicos">${c.escopoServicos}</textarea>
+        </div>
+        <div class="field full">
+          <label>Texto de aprovação</label>
+          <textarea data-config-field="aprovacaoTexto">${c.aprovacaoTexto}</textarea>
+          <div class="field-hint">As linhas de assinatura ("Assinatura do Cliente" / "Assinatura do Responsável") são adicionadas automaticamente logo abaixo deste texto.</div>
+        </div>
+      </div>
+    </div>
+    <div class="form-section">
       <div class="form-eyebrow">Preenchidos automaticamente em novos orçamentos</div>
       <div class="field-grid">
         <div class="field"><label>Garantia padrão</label><input data-config-field="garantia" value="${c.garantia}" /></div>
@@ -730,7 +787,17 @@ document.addEventListener("click", async (e) => {
   else if (action === "sair") await sair();
   else if (action === "nav-lista") { state.view = "lista"; renderPage(); }
   else if (action === "nav-novo") { state.editingId = null; state.form = novoForm(); state.view = "form"; renderPage(); }
-  else if (action === "nav-config") { state.configDraft = { garantia: state.config.garantia, formaPagamento: state.config.formaPagamento }; state.view = "config"; renderPage(); }
+  else if (action === "nav-config") {
+    state.configDraft = {
+      garantia: state.config.garantia,
+      formaPagamento: state.config.formaPagamento,
+      objetivo: state.config.objetivo,
+      escopoServicos: state.config.escopoServicos,
+      aprovacaoTexto: state.config.aprovacaoTexto,
+    };
+    state.view = "config";
+    renderPage();
+  }
   else if (action === "nav-relatorio") { state.view = "relatorio"; renderPage(); }
   else if (action === "imprimir-relatorio") { window.print(); }
   else if (action === "abrir-detalhe") { state.selectedId = id; state.view = "detalhe"; renderPage(); }
