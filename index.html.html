@@ -133,7 +133,7 @@
   .auth-error { background: var(--brick-soft); color: var(--brick); border: 1px solid var(--brick); border-radius: 5px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 12px; }
   .loading-text { text-align: center; padding: 60px 20px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
 
-  @media (max-width: 720px) {
+  @media screen and (max-width: 720px) {
     .app-shell { padding-left: 0; } .ruler { display: none; }
     .field-grid, .condicoes-grid { grid-template-columns: 1fr; }
     .container { padding: 18px 14px 60px; }
@@ -207,7 +207,7 @@
     .items-table td.num { text-align: right; }
   }
 
-  @media (max-width: 420px) {
+  @media screen and (max-width: 420px) {
     .form-actions { flex-direction: column-reverse; }
     .form-actions .btn { width: 100%; }
     .brand-text { font-size: 14.5px; }
