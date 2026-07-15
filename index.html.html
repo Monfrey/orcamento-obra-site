@@ -367,6 +367,8 @@ async function exportarPDF(orcamentoId) {
     const canvas = await html2canvas(elemento, {
       scale: 2,
       backgroundColor: "#FBFCFA",
+      useCORS: true,
+      imageTimeout: 15000,
       ignoreElements: (el) => el.classList.contains("no-print"),
     });
     const imgData = canvas.toDataURL("image/png");
@@ -378,7 +380,9 @@ async function exportarPDF(orcamentoId) {
     const nomeArquivo = `orcamento-${(o.cliente || "obra").trim().toLowerCase().replace(/\s+/g, "-")}.pdf`;
     pdf.save(nomeArquivo);
   } catch (e) {
-    alert("Não foi possível gerar o PDF: " + e.message);
+    const mensagem = (e && e.message) ? e.message : "Erro desconhecido ao capturar a tela (provável bloqueio de CORS na imagem da logo).";
+    console.error("Erro ao exportar PDF:", e);
+    alert("Não foi possível gerar o PDF: " + mensagem);
   }
 
   state.exportando = false;
@@ -553,7 +557,7 @@ function viewDetalhe() {
       <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
     </div>
     <div class="detail-sheet">
-      ${state.config.logoUrl ? `<img class="detail-logo" src="${state.config.logoUrl}" alt="Logo da empresa" />` : ""}
+      ${state.config.logoUrl ? `<img class="detail-logo" src="${state.config.logoUrl}" alt="Logo da empresa" crossorigin="anonymous" />` : ""}
       <div class="detail-top">
         <div>
           <div class="detail-cliente">${o.cliente}</div>
