@@ -21,6 +21,8 @@
     --shadow: rgba(27, 42, 34, 0.10);
   }
   * { box-sizing: border-box; } body { margin: 0; }
+  html, body { max-width: 100%; overflow-x: hidden; }
+  img { max-width: 100%; }
 
   .app-shell { background: var(--paper); background-image: linear-gradient(var(--paper-line) 1px, transparent 1px), linear-gradient(90deg, var(--paper-line) 1px, transparent 1px); background-size: 28px 28px; background-position: -1px -1px; min-height: 100vh; font-family: 'IBM Plex Sans', sans-serif; color: var(--ink); position: relative; padding-left: 34px; }
   .ruler { position: fixed; left: 0; top: 0; bottom: 0; width: 34px; background: var(--blueprint-deep); display: flex; flex-direction: column; align-items: center; padding: 16px 0; z-index: 20; }
@@ -134,7 +136,81 @@
   @media (max-width: 720px) {
     .app-shell { padding-left: 0; } .ruler { display: none; }
     .field-grid, .condicoes-grid { grid-template-columns: 1fr; }
-    .container { padding: 22px 16px 60px; }
+    .container { padding: 18px 14px 60px; }
+
+    /* Cabeçalho */
+    .topbar { padding: 12px 14px; gap: 8px; }
+    .brand-sub { display: none; }
+    .brand-text { font-size: 16px; }
+    .user-chip { gap: 6px; }
+    .user-chip span { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+
+    /* Títulos e ações de página */
+    .page-header { gap: 10px; }
+    .page-title { font-size: 21px; }
+    .page-header .btn, .form-actions .btn { flex: 1; justify-content: center; }
+    .search-row { flex-direction: column; align-items: stretch; }
+
+    /* Cartões da lista */
+    .card-grid { grid-template-columns: 1fr; }
+
+    /* Blocos gerais */
+    .form-section, .detail-sheet { padding: 16px 14px; }
+    .logo-preview-box { flex-wrap: wrap; }
+
+    /* Cabeçalho do orçamento (logo + cliente) empilha no celular */
+    .detail-header-row { flex-direction: column; gap: 14px; }
+    .detail-header-cliente { text-align: left; width: 100%; }
+    .detail-header-cliente .detail-info { align-items: flex-start; }
+
+    /* Assinaturas empilhadas */
+    .assinaturas-row { flex-direction: column; gap: 26px; margin-top: 36px; }
+    .assinatura-item { width: 100%; }
+
+    /* Evita zoom automático do iOS ao tocar em campos (exige fonte >= 16px) */
+    input, select, textarea, .field input, .field select, .field textarea { font-size: 16px !important; }
+
+    /* Tabelas viram cartões empilhados em vez de rolarem para o lado */
+    .items-table thead { display: none; }
+    .items-table, .items-table tbody, .items-table tr, .items-table td { display: block; width: 100%; }
+    .items-table tr {
+      border: 1.5px solid var(--paper-line);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      padding: 8px 12px;
+      background: #fff;
+    }
+    .items-table td {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 7px 0;
+      border-bottom: 1px dashed var(--paper-line);
+    }
+    .items-table td:last-child { border-bottom: none; }
+    .items-table td[data-label]:not([data-label=""])::before {
+      content: attr(data-label);
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--ink-soft);
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .items-table td input, .items-table td select {
+      flex: 1;
+      min-width: 0;
+      text-align: right;
+      margin-left: 10px;
+    }
+    .items-table td.num { text-align: right; }
+  }
+
+  @media (max-width: 420px) {
+    .form-actions { flex-direction: column-reverse; }
+    .form-actions .btn { width: 100%; }
+    .brand-text { font-size: 14.5px; }
   }
 
   @media print {
@@ -590,12 +666,12 @@ function viewForm() {
 function itemRowHTML(it) {
   return `
     <tr data-item-id="${it.id}">
-      <td><input data-item-field="descricao" value="${it.descricao}" placeholder="Ex: Piso porcelanato 60x60" /></td>
-      <td><select data-item-field="unidade">${UNIDADES.map((u) => `<option value="${u}" ${u === it.unidade ? "selected" : ""}>${u}</option>`).join("")}</select></td>
-      <td><input class="num" type="number" data-item-field="quantidade" value="${it.quantidade}" placeholder="0" /></td>
-      <td><input class="num" type="number" data-item-field="valorUnitario" value="${it.valorUnitario}" placeholder="0,00" /></td>
-      <td class="num" data-item-total>${formatBRL(Number(it.quantidade || 0) * Number(it.valorUnitario || 0))}</td>
-      <td><button class="icon-btn" data-action="remover-item" data-id="${it.id}" title="Remover item" style="border-color:var(--brick);color:var(--brick);">${ICON.trash}</button></td>
+      <td data-label="Descrição"><input data-item-field="descricao" value="${it.descricao}" placeholder="Ex: Piso porcelanato 60x60" /></td>
+      <td data-label="Unidade"><select data-item-field="unidade">${UNIDADES.map((u) => `<option value="${u}" ${u === it.unidade ? "selected" : ""}>${u}</option>`).join("")}</select></td>
+      <td data-label="Qtd."><input class="num" type="number" data-item-field="quantidade" value="${it.quantidade}" placeholder="0" /></td>
+      <td data-label="Valor unit."><input class="num" type="number" data-item-field="valorUnitario" value="${it.valorUnitario}" placeholder="0,00" /></td>
+      <td class="num" data-label="Total" data-item-total>${formatBRL(Number(it.quantidade || 0) * Number(it.valorUnitario || 0))}</td>
+      <td data-label=""><button class="icon-btn" data-action="remover-item" data-id="${it.id}" title="Remover item" style="border-color:var(--brick);color:var(--brick);">${ICON.trash}</button></td>
     </tr>`;
 }
 
@@ -636,7 +712,7 @@ function viewDetalhe() {
       <div class="detail-block-title">Dados do orçamento</div>
       <table class="items-table">
         <thead><tr><th class="col-desc">Descrição</th><th class="col-un">Unidade</th><th class="col-qtd">Qtd.</th><th class="col-val">Valor unit.</th><th class="col-tot">Total</th></tr></thead>
-        <tbody>${o.itens.map((it) => `<tr><td>${it.descricao}</td><td>${it.unidade}</td><td class="num">${it.quantidade}</td><td class="num">${formatBRL(it.valorUnitario)}</td><td class="num">${formatBRL(it.quantidade * it.valorUnitario)}</td></tr>`).join("")}</tbody>
+        <tbody>${o.itens.map((it) => `<tr><td data-label="Descrição">${it.descricao}</td><td data-label="Unidade">${it.unidade}</td><td class="num" data-label="Qtd.">${it.quantidade}</td><td class="num" data-label="Valor unit.">${formatBRL(it.valorUnitario)}</td><td class="num" data-label="Total">${formatBRL(it.quantidade * it.valorUnitario)}</td></tr>`).join("")}</tbody>
       </table>
       <div class="totals-bar"><span style="font-size:13px;color:var(--ink-soft);">Valor total do orçamento</span><span class="totals-value">${formatBRL(totalItens(o.itens))}</span></div>
       <div class="detail-block-title">Condições</div>
@@ -675,11 +751,11 @@ function relatorioConteudoHTML(filtro) {
           <tbody>
             ${lista.map((o) => `
               <tr>
-                <td>${o.cliente}</td>
-                <td>${o.endereco || "-"}</td>
-                <td class="no-print">${STATUS_LABEL[o.status]}</td>
-                <td>${o.criadoEm}</td>
-                <td class="num">${formatBRL(totalItens(o.itens))}</td>
+                <td data-label="Cliente">${o.cliente}</td>
+                <td data-label="Endereço">${o.endereco || "-"}</td>
+                <td class="no-print" data-label="Status">${STATUS_LABEL[o.status]}</td>
+                <td data-label="Criado em">${o.criadoEm}</td>
+                <td class="num" data-label="Valor total">${formatBRL(totalItens(o.itens))}</td>
               </tr>`).join("")}
           </tbody>
         </table>
