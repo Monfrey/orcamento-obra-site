@@ -573,7 +573,7 @@ function viewDetalhe() {
       <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
     </div>
     <div class="detail-sheet">
-      ${state.config.logoUrl ? `<img class="detail-logo" src="${state.config.logoUrl}" alt="Logo da empresa" crossorigin="anonymous" />` : ""}
+      ${state.config.logoUrl ? `<img class="detail-logo" src="${state.config.logoUrl}" alt="Logo da empresa" />` : ""}
       <div class="detail-top">
         <div>
           <div class="detail-cliente">${o.cliente}</div>
@@ -583,9 +583,9 @@ function viewDetalhe() {
             ${o.contato ? `<span>Contato: ${o.contato}</span>` : ""}
           </div>
         </div>
-        <div>
+        <div class="no-print">
           <span class="stamp stamp-${o.status}">${STATUS_LABEL[o.status]}</span>
-          <div class="status-controle no-print" style="margin-top:8px;">
+          <div class="status-controle" style="margin-top:8px;">
             <select id="status-select" data-id="${o.id}">
               ${Object.keys(STATUS_LABEL).map((s) => `<option value="${s}" ${s === o.status ? "selected" : ""}>${STATUS_LABEL[s]}</option>`).join("")}
             </select>
@@ -605,7 +605,7 @@ function viewDetalhe() {
         ${o.observacoes ? `<div class="condicao-item" style="grid-column:1/-1;"><strong>Observações</strong>${o.observacoes}</div>` : ""}
       </div>
       <div class="form-actions no-print" style="margin-top:22px;">
-        <button class="btn btn-ghost" data-action="exportar-pdf" data-id="${o.id}" ${state.exportando ? "disabled" : ""}>${ICON.download} ${state.exportando ? "Gerando PDF..." : "Exportar PDF"}</button>
+        <button class="btn btn-ghost" data-action="exportar-pdf" data-id="${o.id}" ${state.exportando ? "disabled" : ""}>${ICON.download} ${state.exportando ? "Gerando..." : "Imprimir"}</button>
         <button class="btn btn-primary" data-action="abrir-edicao" data-id="${o.id}">${ICON.pencil} Editar orçamento</button>
       </div>
     </div>
@@ -619,18 +619,18 @@ function relatorioConteudoHTML(filtro) {
 
   return `
     <div class="detail-sheet">
-      ${state.config.logoUrl ? `<img class="detail-logo" src="${state.config.logoUrl}" alt="Logo da empresa" crossorigin="anonymous" />` : ""}
+      ${state.config.logoUrl ? `<img class="detail-logo" src="${state.config.logoUrl}" alt="Logo da empresa" />` : ""}
       <div class="detail-block-title" style="margin-top:0;">Relatório de orçamentos — ${tituloFiltro}</div>
       <div style="font-size:12px;color:var(--ink-soft);margin-bottom:14px;">Gerado em ${new Date().toLocaleDateString("pt-BR")} · ${lista.length} orçamento${lista.length !== 1 ? "s" : ""}</div>
       ${lista.length === 0 ? `<div class="empty-state">Nenhum orçamento encontrado para este status.</div>` : `
         <table class="items-table">
-          <thead><tr><th>Cliente</th><th>Endereço</th><th>Status</th><th>Criado em</th><th class="num">Valor total</th></tr></thead>
+          <thead><tr><th>Cliente</th><th>Endereço</th><th class="no-print">Status</th><th>Criado em</th><th class="num">Valor total</th></tr></thead>
           <tbody>
             ${lista.map((o) => `
               <tr>
                 <td>${o.cliente}</td>
                 <td>${o.endereco || "-"}</td>
-                <td>${STATUS_LABEL[o.status]}</td>
+                <td class="no-print">${STATUS_LABEL[o.status]}</td>
                 <td>${o.criadoEm}</td>
                 <td class="num">${formatBRL(totalItens(o.itens))}</td>
               </tr>`).join("")}
