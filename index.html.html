@@ -192,7 +192,6 @@ const state = {
     formaPagamento: "40% entrada + saldo na entrega",
     logoUrl: null,
     objetivo: "Esta proposta tem como finalidade apresentar as condições comerciais e técnicas para a prestação de serviços/fornecimento de produtos conforme solicitado.",
-    escopoServicos: "Desmontagem de forro existente, montagem de novo forro, emassamento e pintura na cor branco neve.",
     aprovacaoTexto: "Caso esteja de acordo com os termos desta proposta, solicitamos a confirmação para dar andamento ao processo.",
   },
   orcamentos: [],
@@ -203,8 +202,9 @@ const state = {
   relatorioFiltro: "todos",
 };
 
+const ESCOPO_TEXTO_INICIAL = "Desmontagem de forro existente, montagem de novo forro, emassamento e pintura na cor branco neve.";
 const novoItem = () => ({ id: uid("i"), descricao: "", unidade: "m²", quantidade: "", valorUnitario: "" });
-const novoForm = () => ({ cliente: "", contato: "", endereco: "", prazo: "", garantia: state.config.garantia, formaPagamento: state.config.formaPagamento, observacoes: "", itens: [novoItem()] });
+const novoForm = () => ({ cliente: "", contato: "", endereco: "", prazo: "", escopoServicos: ESCOPO_TEXTO_INICIAL, garantia: state.config.garantia, formaPagamento: state.config.formaPagamento, observacoes: "", itens: [novoItem()] });
 const totalItens = (itens) => itens.reduce((acc, it) => acc + Number(it.quantidade || 0) * Number(it.valorUnitario || 0), 0);
 
 /* ========================================================================
@@ -213,7 +213,7 @@ const totalItens = (itens) => itens.reduce((acc, it) => acc + Number(it.quantida
 function orcamentoFromDb(o) {
   return {
     id: o.id, cliente: o.cliente, contato: o.contato, endereco: o.endereco, prazo: o.prazo,
-    garantia: o.garantia, formaPagamento: o.forma_pagamento, observacoes: o.observacoes,
+    escopoServicos: o.escopo_servicos, garantia: o.garantia, formaPagamento: o.forma_pagamento, observacoes: o.observacoes,
     status: o.status, criadoEm: new Date(o.criado_em).toLocaleDateString("pt-BR"),
     itens: (o.itens_orcamento || []).map((it) => ({ id: it.id, descricao: it.descricao, unidade: it.unidade, quantidade: it.quantidade, valorUnitario: it.valor_unitario })),
   };
@@ -243,7 +243,6 @@ async function carregarDados() {
       formaPagamento: configData.forma_pagamento_padrao,
       logoUrl: configData.logo_url || null,
       objetivo: configData.objetivo || state.config.objetivo,
-      escopoServicos: configData.escopo_servicos || state.config.escopoServicos,
       aprovacaoTexto: configData.aprovacao_texto || state.config.aprovacaoTexto,
     };
   } else {
@@ -252,7 +251,6 @@ async function carregarDados() {
       garantia_padrao: state.config.garantia,
       forma_pagamento_padrao: state.config.formaPagamento,
       objetivo: state.config.objetivo,
-      escopo_servicos: state.config.escopoServicos,
       aprovacao_texto: state.config.aprovacaoTexto,
     });
   }
@@ -266,7 +264,7 @@ async function salvarOrcamentoSupabase(f) {
     // ---- Atualizar orçamento existente ----
     const { error } = await sb.from("orcamentos").update({
       cliente: f.cliente, contato: f.contato, endereco: f.endereco, prazo: f.prazo,
-      garantia: f.garantia, forma_pagamento: f.formaPagamento, observacoes: f.observacoes,
+      escopo_servicos: f.escopoServicos, garantia: f.garantia, forma_pagamento: f.formaPagamento, observacoes: f.observacoes,
     }).eq("id", state.editingId);
     if (error) { alert("Erro ao atualizar orçamento: " + error.message); return; }
 
@@ -290,7 +288,7 @@ async function salvarOrcamentoSupabase(f) {
       .from("orcamentos")
       .insert({
         usuario_id: state.user.id, cliente: f.cliente, contato: f.contato, endereco: f.endereco,
-        prazo: f.prazo, garantia: f.garantia, forma_pagamento: f.formaPagamento,
+        prazo: f.prazo, escopo_servicos: f.escopoServicos, garantia: f.garantia, forma_pagamento: f.formaPagamento,
         observacoes: f.observacoes, status: "rascunho",
       })
       .select()
@@ -326,14 +324,12 @@ async function salvarConfigSupabase(c) {
     garantia_padrao: c.garantia,
     forma_pagamento_padrao: c.formaPagamento,
     objetivo: c.objetivo,
-    escopo_servicos: c.escopoServicos,
     aprovacao_texto: c.aprovacaoTexto,
   });
   if (error) { alert("Erro ao salvar configurações: " + error.message); return; }
   state.config.garantia = c.garantia;
   state.config.formaPagamento = c.formaPagamento;
   state.config.objetivo = c.objetivo;
-  state.config.escopoServicos = c.escopoServicos;
   state.config.aprovacaoTexto = c.aprovacaoTexto;
   state.view = "lista";
   renderPage();
@@ -560,7 +556,15 @@ function viewForm() {
       </div>
     </div>
     <div class="form-section">
-      <div class="form-eyebrow">02 · Itens do orçamento</div>
+      <div class="form-eyebrow">02 · Escopo dos serviços</div>
+      <div class="field-grid">
+        <div class="field full">
+          <textarea data-field="escopoServicos" placeholder="Descreva os serviços que serão realizados nesta obra...">${f.escopoServicos}</textarea>
+        </div>
+      </div>
+    </div>
+    <div class="form-section">
+      <div class="form-eyebrow">03 · Itens do orçamento</div>
       <table class="items-table">
         <thead><tr><th class="col-desc">Descrição</th><th class="col-un">Unidade</th><th class="col-qtd">Qtd.</th><th class="col-val">Valor unit.</th><th class="col-tot">Total</th><th style="width:34px"></th></tr></thead>
         <tbody id="itens-body">${f.itens.map(itemRowHTML).join("")}</tbody>
@@ -569,7 +573,7 @@ function viewForm() {
       <div class="totals-bar"><span style="font-size:13px;color:var(--ink-soft);">Valor total do orçamento</span><span class="totals-value" id="form-total">${formatBRL(totalItens(f.itens))}</span></div>
     </div>
     <div class="form-section">
-      <div class="form-eyebrow">03 · Condições</div>
+      <div class="form-eyebrow">04 · Condições</div>
       <div class="field-grid">
         <div class="field"><label>Garantia</label><input data-field="garantia" value="${f.garantia}" /></div>
         <div class="field"><label>Forma de pagamento</label><input data-field="formaPagamento" value="${f.formaPagamento}" /></div>
@@ -628,7 +632,7 @@ function viewDetalhe() {
       <div class="detail-block-title" style="margin-top:0;">Objetivo</div>
       <p class="detail-texto-padrao">${state.config.objetivo}</p>
       <div class="detail-block-title">Escopo dos serviços</div>
-      <p class="detail-texto-padrao">${state.config.escopoServicos}</p>
+      <p class="detail-texto-padrao">${o.escopoServicos || "-"}</p>
       <div class="detail-block-title">Dados do orçamento</div>
       <table class="items-table">
         <thead><tr><th class="col-desc">Descrição</th><th class="col-un">Unidade</th><th class="col-qtd">Qtd.</th><th class="col-val">Valor unit.</th><th class="col-tot">Total</th></tr></thead>
@@ -743,10 +747,6 @@ function viewConfig() {
           <textarea data-config-field="objetivo">${c.objetivo}</textarea>
         </div>
         <div class="field full">
-          <label>Escopo dos serviços</label>
-          <textarea data-config-field="escopoServicos">${c.escopoServicos}</textarea>
-        </div>
-        <div class="field full">
           <label>Texto de aprovação</label>
           <textarea data-config-field="aprovacaoTexto">${c.aprovacaoTexto}</textarea>
           <div class="field-hint">As linhas de assinatura ("Assinatura do Cliente" / "Assinatura do Responsável") são adicionadas automaticamente logo abaixo deste texto.</div>
@@ -792,7 +792,6 @@ document.addEventListener("click", async (e) => {
       garantia: state.config.garantia,
       formaPagamento: state.config.formaPagamento,
       objetivo: state.config.objetivo,
-      escopoServicos: state.config.escopoServicos,
       aprovacaoTexto: state.config.aprovacaoTexto,
     };
     state.view = "config";
@@ -807,7 +806,7 @@ document.addEventListener("click", async (e) => {
     state.editingId = o.id;
     state.form = {
       cliente: o.cliente, contato: o.contato || "", endereco: o.endereco || "", prazo: o.prazo || "",
-      garantia: o.garantia || "", formaPagamento: o.formaPagamento || "", observacoes: o.observacoes || "",
+      escopoServicos: o.escopoServicos || "", garantia: o.garantia || "", formaPagamento: o.formaPagamento || "", observacoes: o.observacoes || "",
       itens: o.itens.length ? o.itens.map((it) => ({ ...it })) : [novoItem()],
     };
     state.view = "form";
