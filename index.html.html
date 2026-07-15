@@ -57,6 +57,8 @@
   .btn-primary:hover { background: var(--blueprint-deep); }
   .btn-ghost { background: transparent; border-color: var(--ink); color: var(--ink); }
   .btn-ghost:hover { background: var(--ink); color: var(--paper); }
+  .btn-danger { background: transparent; border-color: var(--brick); color: var(--brick); }
+  .btn-danger:hover { background: var(--brick); color: #fff; }
   .btn-block { width: 100%; justify-content: center; }
   .btn-sm { padding: 6px 11px; font-size: 12.5px; }
 
@@ -394,6 +396,18 @@ async function atualizarStatusSupabase(orcamentoId, novoStatus) {
   if (o) o.status = novoStatus;
 }
 
+async function excluirOrcamentoSupabase(orcamentoId) {
+  const confirmar = confirm("Tem certeza que deseja excluir este orçamento? Essa ação não pode ser desfeita.");
+  if (!confirmar) return;
+
+  const { error } = await sb.from("orcamentos").delete().eq("id", orcamentoId);
+  if (error) { alert("Erro ao excluir orçamento: " + error.message); return; }
+
+  state.orcamentos = state.orcamentos.filter((o) => o.id !== orcamentoId);
+  state.view = "lista";
+  renderPage();
+}
+
 async function salvarConfigSupabase(c) {
   const { error } = await sb.from("configuracoes_padrao").upsert({
     usuario_id: state.user.id,
@@ -728,6 +742,7 @@ function viewDetalhe() {
         <div class="assinatura-item">Assinatura do Responsável</div>
       </div>
       <div class="form-actions no-print" style="margin-top:22px;">
+        <button class="btn btn-danger" data-action="excluir-orcamento" data-id="${o.id}">${ICON.trash} Excluir</button>
         <button class="btn btn-ghost" data-action="exportar-pdf" data-id="${o.id}" ${state.exportando ? "disabled" : ""}>${ICON.download} ${state.exportando ? "Gerando..." : "Imprimir"}</button>
         <button class="btn btn-primary" data-action="abrir-edicao" data-id="${o.id}">${ICON.pencil} Editar orçamento</button>
       </div>
@@ -876,6 +891,7 @@ document.addEventListener("click", async (e) => {
   else if (action === "nav-relatorio") { state.view = "relatorio"; renderPage(); }
   else if (action === "imprimir-relatorio") { window.print(); }
   else if (action === "abrir-detalhe") { state.selectedId = id; state.view = "detalhe"; renderPage(); }
+  else if (action === "excluir-orcamento") await excluirOrcamentoSupabase(id);
   else if (action === "abrir-edicao") {
     const o = state.orcamentos.find((x) => x.id === id);
     if (!o) return;
