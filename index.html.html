@@ -131,6 +131,9 @@
   .auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; justify-content: center; }
   .auth-tabs { display: flex; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; margin-bottom: 18px; }
   .auth-tab { flex: 1; text-align: center; padding: 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; border: none; color: var(--ink-soft); }
+  .config-tabs { display: flex; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; margin-bottom: 20px; max-width: 480px; }
+  .config-tab { flex: 1; text-align: center; padding: 10px 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; border: none; color: var(--ink-soft); }
+  .config-tab.active { background: var(--blueprint); color: #fff; }
   .auth-tab.active { background: var(--blueprint); color: #fff; }
   .auth-error { background: var(--brick-soft); color: var(--brick); border: 1px solid var(--brick); border-radius: 5px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 12px; }
   .loading-text { text-align: center; padding: 60px 20px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
@@ -159,6 +162,8 @@
     /* Blocos gerais */
     .form-section, .detail-sheet { padding: 16px 14px; }
     .logo-preview-box { flex-wrap: wrap; }
+    .config-tabs { max-width: 100%; }
+    .config-tab { font-size: 12px; padding: 9px 6px; }
 
     /* Cabeçalho do orçamento (logo + cliente) empilha no celular */
     .detail-header-row { flex-direction: column; gap: 14px; }
@@ -278,6 +283,9 @@ const state = {
   enviandoLogo: false,
   exportando: false,
   relatorioFiltro: "todos",
+  relatorioDataInicio: "",
+  relatorioDataFim: "",
+  configTab: "orcamento",
 };
 
 const ESCOPO_TEXTO_INICIAL = "Desmontagem de forro existente, montagem de novo forro, emassamento e pintura na cor branco neve.";
@@ -292,7 +300,7 @@ function orcamentoFromDb(o) {
   return {
     id: o.id, cliente: o.cliente, contato: o.contato, endereco: o.endereco, prazo: o.prazo,
     escopoServicos: o.escopo_servicos, garantia: o.garantia, formaPagamento: o.forma_pagamento, observacoes: o.observacoes,
-    status: o.status, criadoEm: new Date(o.criado_em).toLocaleDateString("pt-BR"),
+    status: o.status, criadoEm: new Date(o.criado_em).toLocaleDateString("pt-BR"), criadoEmISO: o.criado_em,
     itens: (o.itens_orcamento || []).map((it) => ({ id: it.id, descricao: it.descricao, unidade: it.unidade, quantidade: it.quantidade, valorUnitario: it.valor_unitario })),
   };
 }
@@ -589,7 +597,6 @@ function renderPage() {
   else if (state.view === "form") el.innerHTML = viewForm();
   else if (state.view === "detalhe") el.innerHTML = viewDetalhe();
   else if (state.view === "config") el.innerHTML = viewConfig();
-  else if (state.view === "relatorio") el.innerHTML = viewRelatorio();
 }
 
 function viewLista() {
@@ -750,17 +757,34 @@ function viewDetalhe() {
   `;
 }
 
-function relatorioConteudoHTML(filtro) {
-  const lista = filtro === "todos" ? state.orcamentos : state.orcamentos.filter((o) => o.status === filtro);
+function orcamentosFiltradosRelatorio() {
+  let lista = state.orcamentos;
+  if (state.relatorioFiltro !== "todos") lista = lista.filter((o) => o.status === state.relatorioFiltro);
+  if (state.relatorioDataInicio) {
+    const inicio = new Date(state.relatorioDataInicio + "T00:00:00");
+    lista = lista.filter((o) => o.criadoEmISO && new Date(o.criadoEmISO) >= inicio);
+  }
+  if (state.relatorioDataFim) {
+    const fim = new Date(state.relatorioDataFim + "T23:59:59");
+    lista = lista.filter((o) => o.criadoEmISO && new Date(o.criadoEmISO) <= fim);
+  }
+  return lista;
+}
+
+function relatorioConteudoHTML() {
+  const lista = orcamentosFiltradosRelatorio();
   const totalGeral = lista.reduce((acc, o) => acc + totalItens(o.itens), 0);
-  const tituloFiltro = filtro === "todos" ? "Todos os status" : STATUS_LABEL[filtro];
+  const tituloFiltro = state.relatorioFiltro === "todos" ? "Todos os status" : STATUS_LABEL[state.relatorioFiltro];
+  const periodo = state.relatorioDataInicio || state.relatorioDataFim
+    ? ` · Período: ${state.relatorioDataInicio ? new Date(state.relatorioDataInicio + "T00:00:00").toLocaleDateString("pt-BR") : "início"} até ${state.relatorioDataFim ? new Date(state.relatorioDataFim + "T00:00:00").toLocaleDateString("pt-BR") : "hoje"}`
+    : "";
 
   return `
     <div class="detail-sheet">
       ${state.config.logoUrl ? `<img class="detail-logo" src="${state.config.logoUrl}" alt="Logo da empresa" />` : ""}
-      <div class="detail-block-title" style="margin-top:0;">Relatório de orçamentos — ${tituloFiltro}</div>
+      <div class="detail-block-title" style="margin-top:0;">Relatório de orçamentos — ${tituloFiltro}${periodo}</div>
       <div style="font-size:12px;color:var(--ink-soft);margin-bottom:14px;">Gerado em ${new Date().toLocaleDateString("pt-BR")} · ${lista.length} orçamento${lista.length !== 1 ? "s" : ""}</div>
-      ${lista.length === 0 ? `<div class="empty-state">Nenhum orçamento encontrado para este status.</div>` : `
+      ${lista.length === 0 ? `<div class="empty-state">Nenhum orçamento encontrado para esse filtro.</div>` : `
         <table class="items-table">
           <thead><tr><th>Cliente</th><th>Endereço</th><th class="no-print">Status</th><th>Criado em</th><th class="num">Valor total</th></tr></thead>
           <tbody>
@@ -780,38 +804,8 @@ function relatorioConteudoHTML(filtro) {
   `;
 }
 
-function viewRelatorio() {
+function configOrcamentoHTML(c) {
   return `
-    <div class="page-header">
-      <div><div class="page-title-eyebrow">Relatório</div><div class="page-title">Orçamentos por status</div></div>
-      <button class="btn btn-ghost btn-sm no-print" data-action="nav-config">${ICON.back} Voltar</button>
-    </div>
-    <div class="form-section no-print">
-      <div class="form-eyebrow">Filtrar por status</div>
-      <div class="field-grid">
-        <div class="field">
-          <label>Status</label>
-          <select id="relatorio-status">
-            <option value="todos" ${state.relatorioFiltro === "todos" ? "selected" : ""}>Todos os status</option>
-            ${Object.keys(STATUS_LABEL).map((s) => `<option value="${s}" ${s === state.relatorioFiltro ? "selected" : ""}>${STATUS_LABEL[s]}</option>`).join("")}
-          </select>
-        </div>
-      </div>
-      <div class="form-actions" style="margin-top:14px;justify-content:flex-start;">
-        <button class="btn btn-primary btn-sm" data-action="imprimir-relatorio">${ICON.download} Imprimir / salvar PDF</button>
-      </div>
-    </div>
-    <div id="relatorio-conteudo">${relatorioConteudoHTML(state.relatorioFiltro)}</div>
-  `;
-}
-
-function viewConfig() {
-  const c = state.configDraft;
-  return `
-    <div class="page-header">
-      <div><div class="page-title-eyebrow">Configurações</div><div class="page-title">Valores padrão</div></div>
-      <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
-    </div>
     <div class="form-section">
       <div class="form-eyebrow">Logo da empresa</div>
       <div class="logo-preview-box">
@@ -823,11 +817,6 @@ function viewConfig() {
           <div class="field-hint">${state.enviandoLogo ? "Enviando logo..." : "PNG ou JPG. Aparecerá no cabeçalho do app e nos orçamentos exportados."}</div>
         </div>
       </div>
-    </div>
-    <div class="form-section">
-      <div class="form-eyebrow">Relatórios</div>
-      <p style="font-size:13.5px;color:var(--ink-soft);margin:0 0 12px;">Gere uma lista imprimível dos seus orçamentos filtrados por status (ex: só os aprovados).</p>
-      <button class="btn btn-ghost btn-sm" data-action="nav-relatorio">${ICON.file} Ver relatórios</button>
     </div>
     <div class="form-section">
       <div class="form-eyebrow">Textos padrão do orçamento</div>
@@ -854,7 +843,55 @@ function viewConfig() {
     <div class="form-actions">
       <button class="btn btn-ghost" data-action="nav-lista">Cancelar</button>
       <button class="btn btn-primary" data-action="salvar-config">Salvar configurações</button>
-    </div>`;
+    </div>
+  `;
+}
+
+function configRelatoriosHTML() {
+  return `
+    <div class="form-section no-print">
+      <div class="form-eyebrow">Filtrar relatório</div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Status</label>
+          <select id="relatorio-status">
+            <option value="todos" ${state.relatorioFiltro === "todos" ? "selected" : ""}>Todos os status</option>
+            ${Object.keys(STATUS_LABEL).map((s) => `<option value="${s}" ${s === state.relatorioFiltro ? "selected" : ""}>${STATUS_LABEL[s]}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label>Data inicial</label>
+          <input type="date" id="relatorio-data-inicio" value="${state.relatorioDataInicio}" />
+        </div>
+        <div class="field">
+          <label>Data final</label>
+          <input type="date" id="relatorio-data-fim" value="${state.relatorioDataFim}" />
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:14px;justify-content:flex-start;">
+        <button class="btn btn-primary btn-sm" data-action="imprimir-relatorio">${ICON.download} Imprimir / salvar PDF</button>
+      </div>
+    </div>
+    <div id="relatorio-conteudo">${relatorioConteudoHTML()}</div>
+  `;
+}
+
+function viewConfig() {
+  const c = state.configDraft;
+  return `
+    <div class="page-header">
+      <div>
+        <div class="page-title-eyebrow">Configurações</div>
+        <div class="page-title">${state.configTab === "orcamento" ? "Configurações do orçamento" : "Relatórios"}</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
+    </div>
+    <div class="config-tabs no-print">
+      <button class="config-tab ${state.configTab === "orcamento" ? "active" : ""}" data-action="config-tab" data-tab="orcamento">Configurações do Orçamento</button>
+      <button class="config-tab ${state.configTab === "relatorios" ? "active" : ""}" data-action="config-tab" data-tab="relatorios">Relatórios</button>
+    </div>
+    <div id="config-conteudo">${state.configTab === "orcamento" ? configOrcamentoHTML(c) : configRelatoriosHTML()}</div>
+  `;
 }
 
 /* ============ EVENTOS ============ */
@@ -885,10 +922,11 @@ document.addEventListener("click", async (e) => {
       objetivo: state.config.objetivo,
       aprovacaoTexto: state.config.aprovacaoTexto,
     };
+    state.configTab = "orcamento";
     state.view = "config";
     renderPage();
   }
-  else if (action === "nav-relatorio") { state.view = "relatorio"; renderPage(); }
+  else if (action === "config-tab") { state.configTab = el.dataset.tab; renderPage(); }
   else if (action === "imprimir-relatorio") { window.print(); }
   else if (action === "abrir-detalhe") { state.selectedId = id; state.view = "detalhe"; renderPage(); }
   else if (action === "excluir-orcamento") await excluirOrcamentoSupabase(id);
@@ -950,7 +988,17 @@ document.addEventListener("change", async (e) => {
   }
   if (e.target.id === "relatorio-status") {
     state.relatorioFiltro = e.target.value;
-    document.getElementById("relatorio-conteudo").innerHTML = relatorioConteudoHTML(state.relatorioFiltro);
+    document.getElementById("relatorio-conteudo").innerHTML = relatorioConteudoHTML();
+    return;
+  }
+  if (e.target.id === "relatorio-data-inicio") {
+    state.relatorioDataInicio = e.target.value;
+    document.getElementById("relatorio-conteudo").innerHTML = relatorioConteudoHTML();
+    return;
+  }
+  if (e.target.id === "relatorio-data-fim") {
+    state.relatorioDataFim = e.target.value;
+    document.getElementById("relatorio-conteudo").innerHTML = relatorioConteudoHTML();
   }
 });
 
