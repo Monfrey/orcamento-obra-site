@@ -99,7 +99,7 @@
   .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
 
   .detail-sheet { background: var(--card-bg); border: 1.5px solid var(--ink); border-radius: 8px; padding: 26px 28px; }
-  .detail-logo { max-height: 56px; max-width: 220px; object-fit: contain; margin-bottom: 16px; }
+  .detail-logo { max-height: 110px; max-width: 320px; object-fit: contain; margin-bottom: 20px; }
   .detail-top { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid var(--ink); padding-bottom: 16px; margin-bottom: 16px; gap: 14px; flex-wrap: wrap; }
   .detail-cliente { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 22px; }
   .detail-info { font-size: 13px; color: var(--ink-soft); margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
@@ -129,6 +129,14 @@
     .app-shell { padding-left: 0; } .ruler { display: none; }
     .field-grid, .condicoes-grid { grid-template-columns: 1fr; }
     .container { padding: 22px 16px 60px; }
+  }
+
+  @media print {
+    .ruler, .topbar, .page-header, .no-print { display: none !important; }
+    .app-shell { padding-left: 0; background: #fff; min-height: auto; }
+    .container { padding: 0; max-width: 100%; }
+    .detail-sheet { border: none; box-shadow: none; padding: 0; }
+    body { background: #fff; }
   }
 </style>
 </head>
@@ -179,6 +187,7 @@ const state = {
   configDraft: null,
   enviandoLogo: false,
   exportando: false,
+  relatorioFiltro: "todos",
 };
 
 const novoItem = () => ({ id: uid("i"), descricao: "", unidade: "m²", quantidade: "", valorUnitario: "" });
@@ -380,13 +389,19 @@ async function exportarPDF(orcamentoId) {
     const nomeArquivo = `orcamento-${(o.cliente || "obra").trim().toLowerCase().replace(/\s+/g, "-")}.pdf`;
     pdf.save(nomeArquivo);
   } catch (e) {
-    const mensagem = (e && e.message) ? e.message : "Erro desconhecido ao capturar a tela (provável bloqueio de CORS na imagem da logo).";
-    console.error("Erro ao exportar PDF:", e);
-    alert("Não foi possível gerar o PDF: " + mensagem);
+    console.error("Erro ao exportar PDF automaticamente, abrindo impressão como alternativa:", e);
+    state.exportando = false;
+    renderPage();
+    abrirImpressao();
+    return;
   }
 
   state.exportando = false;
   renderPage();
+}
+
+function abrirImpressao() {
+  window.print();
 }
 
 /* ========================================================================
@@ -457,6 +472,7 @@ function renderPage() {
   else if (state.view === "form") el.innerHTML = viewForm();
   else if (state.view === "detalhe") el.innerHTML = viewDetalhe();
   else if (state.view === "config") el.innerHTML = viewConfig();
+  else if (state.view === "relatorio") el.innerHTML = viewRelatorio();
 }
 
 function viewLista() {
@@ -596,6 +612,61 @@ function viewDetalhe() {
   `;
 }
 
+function relatorioConteudoHTML(filtro) {
+  const lista = filtro === "todos" ? state.orcamentos : state.orcamentos.filter((o) => o.status === filtro);
+  const totalGeral = lista.reduce((acc, o) => acc + totalItens(o.itens), 0);
+  const tituloFiltro = filtro === "todos" ? "Todos os status" : STATUS_LABEL[filtro];
+
+  return `
+    <div class="detail-sheet">
+      ${state.config.logoUrl ? `<img class="detail-logo" src="${state.config.logoUrl}" alt="Logo da empresa" crossorigin="anonymous" />` : ""}
+      <div class="detail-block-title" style="margin-top:0;">Relatório de orçamentos — ${tituloFiltro}</div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:14px;">Gerado em ${new Date().toLocaleDateString("pt-BR")} · ${lista.length} orçamento${lista.length !== 1 ? "s" : ""}</div>
+      ${lista.length === 0 ? `<div class="empty-state">Nenhum orçamento encontrado para este status.</div>` : `
+        <table class="items-table">
+          <thead><tr><th>Cliente</th><th>Endereço</th><th>Status</th><th>Criado em</th><th class="num">Valor total</th></tr></thead>
+          <tbody>
+            ${lista.map((o) => `
+              <tr>
+                <td>${o.cliente}</td>
+                <td>${o.endereco || "-"}</td>
+                <td>${STATUS_LABEL[o.status]}</td>
+                <td>${o.criadoEm}</td>
+                <td class="num">${formatBRL(totalItens(o.itens))}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+        <div class="totals-bar"><span style="font-size:13px;color:var(--ink-soft);">Valor total do relatório</span><span class="totals-value">${formatBRL(totalGeral)}</span></div>
+      `}
+    </div>
+  `;
+}
+
+function viewRelatorio() {
+  return `
+    <div class="page-header">
+      <div><div class="page-title-eyebrow">Relatório</div><div class="page-title">Orçamentos por status</div></div>
+      <button class="btn btn-ghost btn-sm no-print" data-action="nav-config">${ICON.back} Voltar</button>
+    </div>
+    <div class="form-section no-print">
+      <div class="form-eyebrow">Filtrar por status</div>
+      <div class="field-grid">
+        <div class="field">
+          <label>Status</label>
+          <select id="relatorio-status">
+            <option value="todos" ${state.relatorioFiltro === "todos" ? "selected" : ""}>Todos os status</option>
+            ${Object.keys(STATUS_LABEL).map((s) => `<option value="${s}" ${s === state.relatorioFiltro ? "selected" : ""}>${STATUS_LABEL[s]}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="form-actions" style="margin-top:14px;justify-content:flex-start;">
+        <button class="btn btn-primary btn-sm" data-action="imprimir-relatorio">${ICON.download} Imprimir / salvar PDF</button>
+      </div>
+    </div>
+    <div id="relatorio-conteudo">${relatorioConteudoHTML(state.relatorioFiltro)}</div>
+  `;
+}
+
 function viewConfig() {
   const c = state.configDraft;
   return `
@@ -614,6 +685,11 @@ function viewConfig() {
           <div class="field-hint">${state.enviandoLogo ? "Enviando logo..." : "PNG ou JPG. Aparecerá no cabeçalho do app e nos orçamentos exportados."}</div>
         </div>
       </div>
+    </div>
+    <div class="form-section">
+      <div class="form-eyebrow">Relatórios</div>
+      <p style="font-size:13.5px;color:var(--ink-soft);margin:0 0 12px;">Gere uma lista imprimível dos seus orçamentos filtrados por status (ex: só os aprovados).</p>
+      <button class="btn btn-ghost btn-sm" data-action="nav-relatorio">${ICON.file} Ver relatórios</button>
     </div>
     <div class="form-section">
       <div class="form-eyebrow">Preenchidos automaticamente em novos orçamentos</div>
@@ -650,6 +726,8 @@ document.addEventListener("click", async (e) => {
   else if (action === "nav-lista") { state.view = "lista"; renderPage(); }
   else if (action === "nav-novo") { state.editingId = null; state.form = novoForm(); state.view = "form"; renderPage(); }
   else if (action === "nav-config") { state.configDraft = { garantia: state.config.garantia, formaPagamento: state.config.formaPagamento }; state.view = "config"; renderPage(); }
+  else if (action === "nav-relatorio") { state.view = "relatorio"; renderPage(); }
+  else if (action === "imprimir-relatorio") { window.print(); }
   else if (action === "abrir-detalhe") { state.selectedId = id; state.view = "detalhe"; renderPage(); }
   else if (action === "abrir-edicao") {
     const o = state.orcamentos.find((x) => x.id === id);
@@ -705,6 +783,11 @@ document.addEventListener("change", async (e) => {
   }
   if (e.target.id === "logo-input" && e.target.files[0]) {
     await enviarLogoSupabase(e.target.files[0]);
+    return;
+  }
+  if (e.target.id === "relatorio-status") {
+    state.relatorioFiltro = e.target.value;
+    document.getElementById("relatorio-conteudo").innerHTML = relatorioConteudoHTML(state.relatorioFiltro);
   }
 });
 
