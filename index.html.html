@@ -79,6 +79,7 @@
   .obra-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
   .obra-cliente { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 16.5px; }
   .obra-meta { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; }
+  .obra-numero { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--ink-soft); margin-top: 10px; letter-spacing: 0.03em; }
   .obra-valor { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 18px; margin-top: 12px; }
   .obra-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 11.5px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; }
 
@@ -133,6 +134,7 @@
   .detail-texto-padrao { font-size: 14px; line-height: 1.6; color: var(--ink); margin: 0 0 4px; white-space: pre-line; }
   .assinaturas-row { display: flex; justify-content: space-between; gap: 40px; margin-top: 56px; flex-wrap: wrap; }
   .assinatura-item { flex: 1; min-width: 200px; text-align: center; border-top: 1.5px solid var(--ink); padding-top: 8px; font-size: 12.5px; color: var(--ink-soft); }
+  .detail-numero { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--blueprint); font-weight: 600; letter-spacing: 0.04em; margin-bottom: 4px; }
   .detail-cliente { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 22px; }
   .detail-info { font-size: 13px; color: var(--ink-soft); margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
   .detail-block-title { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--blueprint); margin: 18px 0 8px; }
@@ -299,6 +301,7 @@ const UNIDADES = ["m²", "m³", "m", "kg", "un", "verba", "h"];
 const STATUS_LABEL = { rascunho: "Rascunho", enviado: "Enviado", aprovado: "Aprovado", recusado: "Recusado" };
 const formatBRL = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number.isFinite(v) ? v : 0);
 const uid = (p) => `${p}${Date.now()}${Math.random().toString(16).slice(2)}`;
+const gerarNumeroOrcamento = () => String(Math.floor(100000 + Math.random() * 900000));
 
 /* ============ ESTADO ============ */
 const state = {
@@ -328,7 +331,7 @@ const state = {
 
 const ESCOPO_TEXTO_INICIAL = "Desmontagem de forro existente, montagem de novo forro, emassamento e pintura na cor branco neve.";
 const novoItem = () => ({ id: uid("i"), descricao: "", unidade: "m²", quantidade: "", valorUnitario: "" });
-const novoForm = () => ({ cliente: "", contato: "", endereco: "", prazo: "", escopoServicos: ESCOPO_TEXTO_INICIAL, garantia: state.config.garantia, formaPagamento: state.config.formaPagamento, observacoes: "", itens: [novoItem()] });
+const novoForm = () => ({ numero: gerarNumeroOrcamento(), cliente: "", contato: "", endereco: "", prazo: "", escopoServicos: ESCOPO_TEXTO_INICIAL, garantia: state.config.garantia, formaPagamento: state.config.formaPagamento, observacoes: "", itens: [novoItem()] });
 const totalItens = (itens) => itens.reduce((acc, it) => acc + Number(it.quantidade || 0) * Number(it.valorUnitario || 0), 0);
 
 /* ========================================================================
@@ -336,7 +339,7 @@ const totalItens = (itens) => itens.reduce((acc, it) => acc + Number(it.quantida
    ======================================================================== */
 function orcamentoFromDb(o) {
   return {
-    id: o.id, cliente: o.cliente, contato: o.contato, endereco: o.endereco, prazo: o.prazo,
+    id: o.id, numero: o.numero, cliente: o.cliente, contato: o.contato, endereco: o.endereco, prazo: o.prazo,
     escopoServicos: o.escopo_servicos, garantia: o.garantia, formaPagamento: o.forma_pagamento, observacoes: o.observacoes,
     status: o.status, criadoEm: new Date(o.criado_em).toLocaleDateString("pt-BR"), criadoEmISO: o.criado_em,
     itens: (o.itens_orcamento || []).map((it) => ({ id: it.id, descricao: it.descricao, unidade: it.unidade, quantidade: it.quantidade, valorUnitario: it.valor_unitario })),
@@ -411,7 +414,7 @@ async function salvarOrcamentoSupabase(f) {
     const { data: orcamentoInserido, error } = await sb
       .from("orcamentos")
       .insert({
-        usuario_id: state.user.id, cliente: f.cliente, contato: f.contato, endereco: f.endereco,
+        usuario_id: state.user.id, numero: f.numero, cliente: f.cliente, contato: f.contato, endereco: f.endereco,
         prazo: f.prazo, escopo_servicos: f.escopoServicos, garantia: f.garantia, forma_pagamento: f.formaPagamento,
         observacoes: f.observacoes, status: "rascunho",
       })
@@ -655,7 +658,7 @@ function viewLista() {
 
 function gridHTML() {
   const q = state.busca.trim().toLowerCase();
-  const filtrados = q ? state.orcamentos.filter((o) => o.cliente.toLowerCase().includes(q) || (o.endereco || "").toLowerCase().includes(q)) : state.orcamentos;
+  const filtrados = q ? state.orcamentos.filter((o) => o.cliente.toLowerCase().includes(q) || (o.endereco || "").toLowerCase().includes(q) || (o.numero || "").includes(q)) : state.orcamentos;
   if (filtrados.length === 0) return `<div class="empty-state">${ICON.file}<div style="margin-top:10px;">Nenhum orçamento encontrado. Comece criando um novo.</div></div>`;
   return `<div class="card-grid">
     ${filtrados.map((o) => `
@@ -664,6 +667,7 @@ function gridHTML() {
           <div><div class="obra-cliente">${o.cliente}</div><div class="obra-meta">${ICON.pin} ${o.endereco || ""}</div></div>
           <span class="stamp stamp-${o.status}">${STATUS_LABEL[o.status]}</span>
         </div>
+        <div class="obra-numero">Nº ${o.numero || "-"}</div>
         <div class="obra-valor">${formatBRL(totalItens(o.itens))}</div>
         <div class="obra-footer"><span>${ICON.calendar} ${o.prazo || "-"}</span><span>${o.criadoEm}</span></div>
       </div>`).join("")}
@@ -676,7 +680,7 @@ function viewForm() {
   return `
     <div class="page-header">
       <div>
-        <div class="page-title-eyebrow">${editando ? "Editar orçamento" : "Novo orçamento"}</div>
+        <div class="page-title-eyebrow">${editando ? "Editar orçamento" : "Novo orçamento"} · Nº ${f.numero}</div>
         <div class="page-title">Ficha de obra</div>
       </div>
       <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
@@ -739,7 +743,7 @@ function viewDetalhe() {
   if (!o) return `<div class="empty-state">Orçamento não encontrado.</div>`;
   return `
     <div class="page-header">
-      <div><div class="page-title-eyebrow">Orçamento</div><div class="page-title">Ficha de obra</div></div>
+      <div><div class="page-title-eyebrow">Orçamento Nº ${o.numero || "-"}</div><div class="page-title">Ficha de obra</div></div>
       <button class="btn btn-ghost btn-sm" data-action="nav-lista">${ICON.back} Voltar</button>
     </div>
     <div class="detail-sheet">
@@ -748,6 +752,7 @@ function viewDetalhe() {
           ${state.config.logoUrl ? `<img class="detail-logo" src="${state.config.logoUrl}" alt="Logo da empresa" />` : ""}
         </div>
         <div class="detail-header-cliente">
+          <div class="detail-numero">Orçamento Nº ${o.numero || "-"}</div>
           <div class="detail-cliente">${o.cliente}</div>
           <div class="detail-info">
             <span>${ICON.pin} ${o.endereco || "-"}</span>
@@ -824,10 +829,11 @@ function relatorioConteudoHTML() {
       <div style="font-size:12px;color:var(--ink-soft);margin-bottom:14px;">Gerado em ${new Date().toLocaleDateString("pt-BR")} · ${lista.length} orçamento${lista.length !== 1 ? "s" : ""}</div>
       ${lista.length === 0 ? `<div class="empty-state">Nenhum orçamento encontrado para esse filtro.</div>` : `
         <table class="items-table">
-          <thead><tr><th>Cliente</th><th>Endereço</th><th class="no-print">Status</th><th>Criado em</th><th class="num">Valor total</th></tr></thead>
+          <thead><tr><th>Nº</th><th>Cliente</th><th>Endereço</th><th class="no-print">Status</th><th>Criado em</th><th class="num">Valor total</th></tr></thead>
           <tbody>
             ${lista.map((o) => `
               <tr>
+                <td data-label="Nº">${o.numero || "-"}</td>
                 <td data-label="Cliente">${o.cliente}</td>
                 <td data-label="Endereço">${o.endereco || "-"}</td>
                 <td class="no-print" data-label="Status">${STATUS_LABEL[o.status]}</td>
@@ -973,7 +979,7 @@ document.addEventListener("click", async (e) => {
     if (!o) return;
     state.editingId = o.id;
     state.form = {
-      cliente: o.cliente, contato: o.contato || "", endereco: o.endereco || "", prazo: o.prazo || "",
+      numero: o.numero, cliente: o.cliente, contato: o.contato || "", endereco: o.endereco || "", prazo: o.prazo || "",
       escopoServicos: o.escopoServicos || "", garantia: o.garantia || "", formaPagamento: o.formaPagamento || "", observacoes: o.observacoes || "",
       itens: o.itens.length ? o.itens.map((it) => ({ ...it })) : [novoItem()],
     };
