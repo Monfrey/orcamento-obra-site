@@ -53,6 +53,7 @@
 
   .container { max-width: 980px; margin: 0 auto; padding: 32px 28px 80px; }
   .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
+  .page-header > div:first-child { min-width: 0; }
   .page-title { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 26px; letter-spacing: -0.01em; }
   .page-title-eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--blueprint); margin-bottom: 4px; }
 
@@ -171,7 +172,8 @@
     /* Títulos e ações de página */
     .page-header { gap: 10px; }
     .page-title { font-size: 21px; }
-    .page-header .btn, .form-actions .btn { flex: 1; justify-content: center; }
+    .form-actions .btn { flex: 1; justify-content: center; }
+    .page-header .btn { flex-shrink: 0; }
     .search-row { flex-direction: column; align-items: stretch; }
 
     /* Cartões da lista */
