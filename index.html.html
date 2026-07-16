@@ -91,6 +91,10 @@
   .field label { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
   .field input, .field select, .field textarea { border: 1.5px solid var(--paper-line); border-radius: 5px; padding: 9px 10px; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; color: var(--ink); background: #fff; outline: none; width: 100%; max-width: 100%; box-sizing: border-box; }
   input[type="date"] { min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    margin-left: 6px;
+    padding: 2px;
+  }
   .field input[type="date"] { min-width: 0; }
   .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--blueprint); }
   .field textarea { resize: vertical; min-height: 70px; }
@@ -147,8 +151,8 @@
   @media screen and (max-width: 720px) {
     .app-shell { padding-left: 0; } .ruler { display: none; }
     .field-grid, .field-grid-3, .condicoes-grid { grid-template-columns: minmax(0, 1fr); }
-    .container { padding: 18px 14px 60px; }
-    input[type="date"] { padding: 9px 6px; }
+    .container { padding: 18px 16px 60px; }
+    input[type="date"] { padding: 9px 10px; }
 
     /* Cabeçalho */
     .topbar { padding: 12px 14px; gap: 8px; }
@@ -167,7 +171,7 @@
     .card-grid { grid-template-columns: 1fr; }
 
     /* Blocos gerais */
-    .form-section, .detail-sheet { padding: 16px 14px; }
+    .form-section, .detail-sheet { padding: 16px 16px; }
     .logo-preview-box { flex-wrap: wrap; }
     .config-tabs { max-width: 100%; }
     .config-tab { font-size: 12px; padding: 9px 6px; }
