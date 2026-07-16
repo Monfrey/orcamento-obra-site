@@ -98,7 +98,9 @@
   .field.full { grid-column: 1 / -1; }
   .field label { font-size: 12px; font-weight: 600; color: var(--ink-soft); }
   .field input, .field select, .field textarea { border: 1.5px solid var(--paper-line); border-radius: 5px; padding: 9px 10px; font-family: 'IBM Plex Sans', sans-serif; font-size: 14px; color: var(--ink); background: #fff; outline: none; width: 100%; max-width: 100%; box-sizing: border-box; }
-  input[type="date"] { min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  input[type="date"] { min-width: 0; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; -webkit-appearance: none; appearance: none; }
+  .date-input-wrap { display: flex; width: 100%; min-width: 0; }
+  .date-input-wrap input[type="date"] { flex: 1 1 auto; width: 1px; min-width: 0; }
   input[type="date"]::-webkit-calendar-picker-indicator {
     margin-left: 6px;
     padding: 2px;
@@ -197,7 +199,6 @@
     /* Evita zoom automático do iOS ao tocar em campos (exige fonte >= 16px) */
     input, select, textarea, .field input, .field select, .field textarea { font-size: 16px !important; }
     input[type="date"] {
-      width: 100% !important;
       max-width: 100% !important;
       min-width: 0 !important;
       box-sizing: border-box !important;
@@ -205,7 +206,11 @@
       text-overflow: ellipsis !important;
       white-space: nowrap !important;
       padding: 9px 10px !important;
+      -webkit-appearance: none !important;
+      appearance: none !important;
     }
+    .date-input-wrap { display: flex !important; width: 100% !important; min-width: 0 !important; }
+    .date-input-wrap input[type="date"] { flex: 1 1 auto !important; width: 1px !important; min-width: 0 !important; }
     .field-grid { column-gap: 12px; }
 
     /* Tabelas viram cartões empilhados em vez de rolarem para o lado */
@@ -892,11 +897,11 @@ function configRelatoriosHTML() {
         </div>
         <div class="field">
           <label>Data inicial</label>
-          <input type="date" id="relatorio-data-inicio" value="${state.relatorioDataInicio}" />
+          <div class="date-input-wrap"><input type="date" id="relatorio-data-inicio" value="${state.relatorioDataInicio}" /></div>
         </div>
         <div class="field">
           <label>Data final</label>
-          <input type="date" id="relatorio-data-fim" value="${state.relatorioDataFim}" />
+          <div class="date-input-wrap"><input type="date" id="relatorio-data-fim" value="${state.relatorioDataFim}" /></div>
         </div>
       </div>
       <div class="form-actions" style="margin-top:14px;justify-content:flex-start;">
