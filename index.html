@@ -159,6 +159,7 @@
   .config-tab { flex: 1; text-align: center; padding: 10px 8px; font-size: 13px; font-weight: 600; cursor: pointer; background: transparent; border: none; color: var(--ink-soft); }
   .config-tab.active { background: var(--blueprint); color: #fff; }
   .auth-tab.active { background: var(--blueprint); color: #fff; }
+  .auth-link-btn { background: none; border: none; padding: 0; color: var(--blueprint); font-size: 12.5px; font-family: 'IBM Plex Sans', sans-serif; cursor: pointer; text-decoration: underline; }
   .auth-error { background: var(--brick-soft); color: var(--brick); border: 1px solid var(--brick); border-radius: 5px; padding: 8px 10px; font-size: 12.5px; margin-bottom: 12px; }
   .loading-text { text-align: center; padding: 60px 20px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
 
@@ -307,6 +308,7 @@ const gerarNumeroOrcamento = () => String(Math.floor(100000 + Math.random() * 90
 const state = {
   view: "lista",
   authMode: "entrar",
+  recuperandoSenha: false,
   busca: "",
   selectedId: null,
   editingId: null,
@@ -552,6 +554,40 @@ async function cadastrarComEmailSenha(email, senha) {
 }
 async function sair() { await sb.auth.signOut(); }
 
+function estaNaUrlDeRecuperacao() {
+  return window.location.hash.includes("type=recovery") || window.location.search.includes("type=recovery");
+}
+
+async function enviarRecuperacaoSenha(email) {
+  if (!email) { mostrarErroAuth("Informe seu e-mail para recuperar a senha."); return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname,
+  });
+  if (error) { mostrarErroAuth(error.message); return; }
+  mostrarErroAuth("Enviamos um link de recuperação para o seu e-mail. Verifique também a caixa de spam.", true);
+}
+
+async function definirNovaSenha(novaSenha, confirmarSenha) {
+  if (!novaSenha || novaSenha.length < 6) { mostrarErroNovaSenha("A senha deve ter pelo menos 6 caracteres."); return; }
+  if (novaSenha !== confirmarSenha) { mostrarErroNovaSenha("As senhas não coincidem."); return; }
+
+  const { error } = await sb.auth.updateUser({ password: novaSenha });
+  if (error) { mostrarErroNovaSenha(error.message); return; }
+
+  state.recuperandoSenha = false;
+  mostrarErroNovaSenha("Senha alterada com sucesso! Entrando...", true);
+  setTimeout(() => afterLogin(), 900);
+}
+
+function mostrarErroNovaSenha(msg, ok) {
+  const box = document.getElementById("nova-senha-erro");
+  if (!box) return;
+  box.textContent = msg;
+  box.style.display = "block";
+  if (ok) { box.style.background = "var(--approved-soft)"; box.style.color = "var(--approved)"; box.style.borderColor = "var(--approved)"; }
+  else { box.style.background = "var(--brick-soft)"; box.style.color = "var(--brick)"; box.style.borderColor = "var(--brick)"; }
+}
+
 function mostrarErroAuth(msg, ok) {
   const box = document.getElementById("auth-error");
   if (!box) return;
@@ -608,6 +644,38 @@ function abrirImpressao() {
    RENDER: TELA DE LOGIN
    ======================================================================== */
 function renderAuthShell() {
+  const modo = state.authMode; // "entrar" | "cadastrar" | "recuperar"
+
+  const camposEmailSenha = modo === "recuperar" ? `
+    <div class="field" style="margin-bottom:16px;">
+      <label>E-mail</label>
+      <input id="auth-email" type="email" placeholder="voce@email.com" />
+    </div>
+  ` : `
+    <div class="field" style="margin-bottom:12px;">
+      <label>E-mail</label>
+      <input id="auth-email" type="email" placeholder="voce@email.com" />
+    </div>
+    <div class="field" style="margin-bottom:${modo === "entrar" ? "6px" : "16px"};">
+      <label>Senha</label>
+      <input id="auth-senha" type="password" placeholder="••••••••" />
+    </div>
+    ${modo === "entrar" ? `
+      <div style="text-align:right;margin-bottom:16px;">
+        <button type="button" class="auth-link-btn" data-action="auth-tab" data-mode="recuperar">Esqueci minha senha</button>
+      </div>
+    ` : ""}
+  `;
+
+  const botoes = modo === "recuperar" ? `
+    <button class="btn btn-primary btn-block" data-action="recuperar-senha">Enviar link de recuperação</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:8px;" data-action="auth-tab" data-mode="entrar">Voltar para o login</button>
+  ` : `
+    <button class="btn btn-primary btn-block" data-action="${modo === "entrar" ? "entrar" : "cadastrar"}">
+      ${modo === "entrar" ? "Entrar" : "Criar conta"}
+    </button>
+  `;
+
   document.getElementById("root").innerHTML = `
     <div class="auth-wrap">
       <div class="auth-card">
@@ -618,22 +686,43 @@ function renderAuthShell() {
             <div class="brand-sub">medir · orçar · construir</div>
           </div>
         </div>
-        <div class="auth-tabs">
-          <button class="auth-tab ${state.authMode === "entrar" ? "active" : ""}" data-action="auth-tab" data-mode="entrar">Entrar</button>
-          <button class="auth-tab ${state.authMode === "cadastrar" ? "active" : ""}" data-action="auth-tab" data-mode="cadastrar">Criar conta</button>
-        </div>
+        ${modo !== "recuperar" ? `
+          <div class="auth-tabs">
+            <button class="auth-tab ${modo === "entrar" ? "active" : ""}" data-action="auth-tab" data-mode="entrar">Entrar</button>
+            <button class="auth-tab ${modo === "cadastrar" ? "active" : ""}" data-action="auth-tab" data-mode="cadastrar">Criar conta</button>
+          </div>
+        ` : `<div class="page-title-eyebrow" style="margin-bottom:14px;">Recuperar senha</div>`}
         <div id="auth-error" class="auth-error" style="display:none;"></div>
+        ${camposEmailSenha}
+        ${botoes}
+      </div>
+    </div>
+  `;
+}
+
+/* ============ RENDER: TELA DE NOVA SENHA (após clicar no link do e-mail) ============ */
+function renderNovaSenhaShell() {
+  document.getElementById("root").innerHTML = `
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <div class="brand-mark">${ICON.ruler}</div>
+          <div>
+            <div class="brand-text">Orçamento de Obra</div>
+            <div class="brand-sub">medir · orçar · construir</div>
+          </div>
+        </div>
+        <div class="page-title-eyebrow" style="margin-bottom:14px;">Defina sua nova senha</div>
+        <div id="nova-senha-erro" class="auth-error" style="display:none;"></div>
         <div class="field" style="margin-bottom:12px;">
-          <label>E-mail</label>
-          <input id="auth-email" type="email" placeholder="voce@email.com" />
+          <label>Nova senha</label>
+          <input id="nova-senha-1" type="password" placeholder="••••••••" />
         </div>
         <div class="field" style="margin-bottom:16px;">
-          <label>Senha</label>
-          <input id="auth-senha" type="password" placeholder="••••••••" />
+          <label>Confirmar nova senha</label>
+          <input id="nova-senha-2" type="password" placeholder="••••••••" />
         </div>
-        <button class="btn btn-primary btn-block" data-action="${state.authMode === "entrar" ? "entrar" : "cadastrar"}">
-          ${state.authMode === "entrar" ? "Entrar" : "Criar conta"}
-        </button>
+        <button class="btn btn-primary btn-block" data-action="definir-nova-senha">Salvar nova senha</button>
       </div>
     </div>
   `;
@@ -986,6 +1075,15 @@ document.addEventListener("click", async (e) => {
   const id = el.dataset.id;
 
   if (action === "auth-tab") { state.authMode = el.dataset.mode; renderAuthShell(); }
+  else if (action === "recuperar-senha") {
+    const email = document.getElementById("auth-email").value.trim();
+    await enviarRecuperacaoSenha(email);
+  }
+  else if (action === "definir-nova-senha") {
+    const s1 = document.getElementById("nova-senha-1").value;
+    const s2 = document.getElementById("nova-senha-2").value;
+    await definirNovaSenha(s1, s2);
+  }
   else if (action === "entrar") {
     const email = document.getElementById("auth-email").value.trim();
     const senha = document.getElementById("auth-senha").value;
@@ -1097,11 +1195,25 @@ async function afterLogin() {
 }
 
 async function init() {
+  if (estaNaUrlDeRecuperacao()) {
+    state.recuperandoSenha = true;
+    renderNovaSenhaShell();
+  }
+
   const { data: { session } } = await sb.auth.getSession();
-  if (session) await afterLogin();
-  else renderAuthShell();
+  if (!state.recuperandoSenha) {
+    if (session) await afterLogin();
+    else renderAuthShell();
+  }
 
   sb.auth.onAuthStateChange((event, session) => {
+    if (event === "PASSWORD_RECOVERY") {
+      state.recuperandoSenha = true;
+      window.history.replaceState(null, "", window.location.pathname);
+      renderNovaSenhaShell();
+      return;
+    }
+    if (state.recuperandoSenha) return; // aguarda o usuário definir a nova senha antes de seguir outros eventos
     if (event === "SIGNED_IN") afterLogin();
     if (event === "SIGNED_OUT") { state.orcamentos = []; state.view = "lista"; renderAuthShell(); }
   });
