@@ -554,6 +554,10 @@ async function cadastrarComEmailSenha(email, senha) {
 }
 async function sair() { await sb.auth.signOut(); }
 
+function estaNaUrlDeRecuperacao() {
+  return window.location.hash.includes("type=recovery") || window.location.search.includes("type=recovery");
+}
+
 async function enviarRecuperacaoSenha(email) {
   if (!email) { mostrarErroAuth("Informe seu e-mail para recuperar a senha."); return; }
   const { error } = await sb.auth.resetPasswordForEmail(email, {
@@ -1191,6 +1195,17 @@ async function afterLogin() {
 }
 
 async function init() {
+  if (estaNaUrlDeRecuperacao()) {
+    state.recuperandoSenha = true;
+    renderNovaSenhaShell();
+  }
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (!state.recuperandoSenha) {
+    if (session) await afterLogin();
+    else renderAuthShell();
+  }
+
   sb.auth.onAuthStateChange((event, session) => {
     if (event === "PASSWORD_RECOVERY") {
       state.recuperandoSenha = true;
@@ -1202,11 +1217,6 @@ async function init() {
     if (event === "SIGNED_IN") afterLogin();
     if (event === "SIGNED_OUT") { state.orcamentos = []; state.view = "lista"; renderAuthShell(); }
   });
-
-  const { data: { session } } = await sb.auth.getSession();
-  if (state.recuperandoSenha) return; // já tratado pelo evento PASSWORD_RECOVERY acima
-  if (session) await afterLogin();
-  else renderAuthShell();
 }
 
 init();
