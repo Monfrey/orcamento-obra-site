@@ -54,6 +54,8 @@
   .container { max-width: 980px; margin: 0 auto; padding: 32px 28px 80px; }
   .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 22px; flex-wrap: wrap; gap: 14px; }
   .page-header > div:first-child { min-width: 0; }
+  .draft-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding: 12px 14px; background: var(--tape-soft); border: 1px solid var(--tape); border-radius: 8px; font-size: 13.5px; color: var(--ink); }
+  .draft-banner-actions { display: flex; gap: 8px; }
   .page-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .page-title { font-family: 'Archivo Expanded', sans-serif; font-weight: 800; font-size: 26px; letter-spacing: -0.01em; }
   .page-title-eyebrow { font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--blueprint); margin-bottom: 4px; }
@@ -305,11 +307,60 @@ const formatBRL = (v) => new Intl.NumberFormat("pt-BR", { style: "currency", cur
 const uid = (p) => `${p}${Date.now()}${Math.random().toString(16).slice(2)}`;
 const gerarNumeroOrcamento = () => String(Math.floor(100000 + Math.random() * 900000));
 
+/* ============ RASCUNHO DO FORMULÁRIO (persiste no aparelho) ============ */
+const RASCUNHO_PREFIX = "orcamento_rascunho:";
+const RASCUNHO_VALIDADE_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
+let rascunhoTimer = null;
+let rascunhoPendenteGravacao = false;
+const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function rascunhoKey() { return state.user?.id ? RASCUNHO_PREFIX + state.user.id : null; }
+function lerRascunho() {
+  try {
+    const k = rascunhoKey(); if (!k) return null;
+    const raw = localStorage.getItem(k); if (!raw) return null;
+    const r = JSON.parse(raw);
+    if (!r || !r.form || !Array.isArray(r.form.itens) || Date.now() - r.ts > RASCUNHO_VALIDADE_MS) { localStorage.removeItem(k); return null; }
+    return r;
+  } catch (e) { return null; }
+}
+function gravarRascunho() {
+  try {
+    const k = rascunhoKey(); if (!k || !state.form) return;
+    localStorage.setItem(k, JSON.stringify({ form: state.form, editingId: state.editingId, ativo: true, ts: Date.now() }));
+  } catch (e) { /* armazenamento indisponível: segue sem rascunho */ }
+  rascunhoPendenteGravacao = false;
+}
+function agendarRascunho() {
+  rascunhoPendenteGravacao = true;
+  clearTimeout(rascunhoTimer);
+  rascunhoTimer = setTimeout(() => { if (state.view === "form") gravarRascunho(); }, 250);
+}
+function salvarRascunhoAgora() {
+  clearTimeout(rascunhoTimer);
+  if (rascunhoPendenteGravacao && state.view === "form") gravarRascunho();
+}
+function limparRascunho() {
+  clearTimeout(rascunhoTimer); rascunhoPendenteGravacao = false;
+  try { const k = rascunhoKey(); if (k) localStorage.removeItem(k); } catch (e) {}
+}
+function desativarRascunho() { // saiu da tela do formulário: mantém o rascunho, mas inativo
+  const r = lerRascunho();
+  if (r && r.ativo) { try { localStorage.setItem(rascunhoKey(), JSON.stringify({ ...r, ativo: false })); } catch (e) {} }
+}
+function restaurarRascunho(r) {
+  if (r.editingId && !state.orcamentos.some((o) => o.id === r.editingId)) r.editingId = null;
+  state.editingId = r.editingId || null;
+  state.form = r.form;
+  state.view = "form";
+}
+
 /* ============ ESTADO ============ */
 const state = {
   view: "lista",
   authMode: "entrar",
   recuperandoSenha: false,
+  authUserId: null,
   busca: "",
   selectedId: null,
   editingId: null,
@@ -470,6 +521,7 @@ async function salvarOrcamentoSupabase(f) {
     }
   }
 
+  limparRascunho();
   await carregarDados();
   state.view = "lista";
   renderPage();
@@ -757,6 +809,7 @@ function renderShell() {
 function renderPage() {
   const el = document.getElementById("page-container");
   if (!el) return;
+  if (state.view !== "form") desativarRascunho();
   if (state.view === "lista") el.innerHTML = viewLista();
   else if (state.view === "form") el.innerHTML = viewForm();
   else if (state.view === "detalhe") el.innerHTML = viewDetalhe();
@@ -775,6 +828,18 @@ function viewLista() {
         <button class="btn btn-primary" data-action="nav-novo">${ICON.plus} Novo orçamento</button>
       </div>
     </div>
+    ${(() => {
+      const r = lerRascunho();
+      if (!r || r.ativo) return "";
+      const nome = (r.form.cliente || "").trim();
+      return `<div class="draft-banner">
+        <span>Você tem um orçamento em preenchimento${nome ? ` (<b>${esc(nome)}</b>)` : ""}.</span>
+        <span class="draft-banner-actions">
+          <button class="btn btn-primary btn-sm" data-action="retomar-rascunho">Continuar</button>
+          <button class="btn btn-ghost btn-sm" data-action="descartar-rascunho">Descartar</button>
+        </span>
+      </div>`;
+    })()}
     ${state.erroCarregamento ? `
       <div class="auth-error" style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
         <span>${state.erroCarregamento}</span>
@@ -852,7 +917,7 @@ function viewForm() {
       </div>
     </div>
     <div class="form-actions">
-      <button class="btn btn-ghost" data-action="nav-lista">Cancelar</button>
+      <button class="btn btn-ghost" data-action="cancelar-form">Cancelar</button>
       <button class="btn btn-primary" data-action="salvar-orcamento">${editando ? "Salvar alterações" : "Salvar orçamento"}</button>
     </div>
   `;
@@ -1128,8 +1193,21 @@ document.addEventListener("click", async (e) => {
     state.view = "form";
     renderPage();
   }
-  else if (action === "adicionar-item") { state.form.itens.push(novoItem()); renderPage(); }
-  else if (action === "remover-item") { state.form.itens = state.form.itens.filter((it) => it.id !== id); renderPage(); }
+  else if (action === "adicionar-item") { state.form.itens.push(novoItem()); agendarRascunho(); renderPage(); }
+  else if (action === "remover-item") { state.form.itens = state.form.itens.filter((it) => it.id !== id); agendarRascunho(); renderPage(); }
+  else if (action === "cancelar-form") {
+    if (lerRascunho() && !confirm("Descartar o preenchimento deste orçamento? Os dados digitados serão perdidos.")) return;
+    limparRascunho();
+    state.editingId = null; state.view = "lista"; renderPage();
+  }
+  else if (action === "retomar-rascunho") {
+    const r = lerRascunho(); if (!r) return;
+    restaurarRascunho(r); renderPage();
+  }
+  else if (action === "descartar-rascunho") {
+    if (!confirm("Descartar o orçamento em preenchimento?")) return;
+    limparRascunho(); renderPage();
+  }
   else if (action === "salvar-orcamento") await salvarOrcamentoSupabase(state.form);
   else if (action === "salvar-config") await salvarConfigSupabase(state.configDraft);
   else if (action === "exportar-pdf") await exportarPDF(id);
@@ -1141,7 +1219,7 @@ document.addEventListener("input", (e) => {
     document.getElementById("grid-container").innerHTML = gridHTML();
     return;
   }
-  if (e.target.dataset.field && state.form) { state.form[e.target.dataset.field] = e.target.value; return; }
+  if (e.target.dataset.field && state.form) { state.form[e.target.dataset.field] = e.target.value; agendarRascunho(); return; }
   if (e.target.dataset.configField && state.configDraft) { state.configDraft[e.target.dataset.configField] = e.target.value; return; }
 
   const row = e.target.closest("[data-item-id]");
@@ -1149,6 +1227,7 @@ document.addEventListener("input", (e) => {
     const item = state.form.itens.find((it) => it.id === row.dataset.itemId);
     if (!item) return;
     item[e.target.dataset.itemField] = e.target.value;
+    agendarRascunho();
     if (["quantidade", "valorUnitario"].includes(e.target.dataset.itemField)) {
       row.querySelector("[data-item-total]").textContent = formatBRL(Number(item.quantidade || 0) * Number(item.valorUnitario || 0));
       document.getElementById("form-total").textContent = formatBRL(totalItens(state.form.itens));
@@ -1161,6 +1240,7 @@ document.addEventListener("change", async (e) => {
   if (row && e.target.dataset.itemField === "unidade") {
     const item = state.form.itens.find((it) => it.id === row.dataset.itemId);
     if (item) item.unidade = e.target.value;
+    agendarRascunho();
     return;
   }
   if (e.target.id === "status-select") {
@@ -1189,11 +1269,15 @@ document.addEventListener("change", async (e) => {
 });
 
 /* ============ INICIALIZAÇÃO ============ */
-async function afterLogin() {
+async function afterLogin(userId) {
+  if (userId) state.authUserId = userId;
   renderShell();
   await carregarDados();
+  if (state.user?.id) state.authUserId = state.user.id;
   renderShell(); // atualiza o cabeçalho caso já exista logo salva
   state.view = "lista";
+  const r = lerRascunho();
+  if (r && r.ativo) restaurarRascunho(r); // reabriu o app no meio do preenchimento: volta pro formulário
   renderPage();
 }
 
@@ -1205,7 +1289,7 @@ async function init() {
 
   const { data: { session } } = await sb.auth.getSession();
   if (!state.recuperandoSenha) {
-    if (session) await afterLogin();
+    if (session) await afterLogin(session.user?.id);
     else renderAuthShell();
   }
 
@@ -1217,9 +1301,18 @@ async function init() {
       return;
     }
     if (state.recuperandoSenha) return; // aguarda o usuário definir a nova senha antes de seguir outros eventos
-    if (event === "SIGNED_IN") afterLogin();
-    if (event === "SIGNED_OUT") { state.orcamentos = []; state.view = "lista"; renderAuthShell(); }
+    if (event === "SIGNED_IN") {
+      // O Supabase reemite SIGNED_IN quando o app volta ao primeiro plano (comum no mobile).
+      // Se é o mesmo usuário já carregado, NÃO recarrega a tela (isso zerava o formulário em preenchimento).
+      if (state.authUserId && session?.user?.id === state.authUserId) return;
+      afterLogin(session?.user?.id);
+    }
+    if (event === "SIGNED_OUT") { salvarRascunhoAgora(); state.authUserId = null; state.orcamentos = []; state.view = "lista"; renderAuthShell(); }
   });
+
+  // Garante que o último trecho digitado seja gravado ao trocar de app/aba ou fechar a página
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") salvarRascunhoAgora(); });
+  window.addEventListener("pagehide", salvarRascunhoAgora);
 }
 
 init();
