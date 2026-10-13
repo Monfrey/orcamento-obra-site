@@ -355,6 +355,9 @@ function restaurarRascunho(r) {
   state.view = "form";
 }
 
+const ESCOPO_TEXTO_INICIAL = "Desmontagem de forro existente, montagem de novo forro, emassamento e pintura na cor branco neve.";
+const tem = (v) => String(v ?? "").trim() !== ""; // campo preenchido (espaços não contam)
+
 /* ============ ESTADO ============ */
 const state = {
   view: "lista",
@@ -371,6 +374,7 @@ const state = {
     logoUrl: null,
     objetivo: "Esta proposta tem como finalidade apresentar as condições comerciais e técnicas para a prestação de serviços/fornecimento de produtos conforme solicitado.",
     aprovacaoTexto: "Caso esteja de acordo com os termos desta proposta, solicitamos a confirmação para dar andamento ao processo.",
+    escopoServicos: ESCOPO_TEXTO_INICIAL,
   },
   orcamentos: [],
   erroCarregamento: null,
@@ -384,9 +388,8 @@ const state = {
   configTab: "orcamento",
 };
 
-const ESCOPO_TEXTO_INICIAL = "Desmontagem de forro existente, montagem de novo forro, emassamento e pintura na cor branco neve.";
 const novoItem = () => ({ id: uid("i"), descricao: "", unidade: "m²", quantidade: "", valorUnitario: "" });
-const novoForm = () => ({ numero: gerarNumeroOrcamento(), cliente: "", contato: "", endereco: "", prazo: "", escopoServicos: ESCOPO_TEXTO_INICIAL, garantia: state.config.garantia, formaPagamento: state.config.formaPagamento, observacoes: "", itens: [novoItem()] });
+const novoForm = () => ({ numero: gerarNumeroOrcamento(), cliente: "", contato: "", endereco: "", prazo: "", escopoServicos: state.config.escopoServicos ?? "", garantia: state.config.garantia, formaPagamento: state.config.formaPagamento, observacoes: "", itens: [novoItem()] });
 const totalItens = (itens) => itens.reduce((acc, it) => acc + Number(it.quantidade || 0) * Number(it.valorUnitario || 0), 0);
 
 /* ========================================================================
@@ -434,6 +437,8 @@ async function carregarDados() {
       logoUrl: configData.logo_url || null,
       objetivo: configData.objetivo || state.config.objetivo,
       aprovacaoTexto: configData.aprovacao_texto || state.config.aprovacaoTexto,
+      // null = nunca definido (usa o texto inicial); string vazia = o usuário optou por deixar em branco
+      escopoServicos: configData.escopo_padrao ?? ESCOPO_TEXTO_INICIAL,
     };
   } else {
     const { error: errInsertConfig } = await sb.from("configuracoes_padrao").insert({
@@ -547,18 +552,27 @@ async function excluirOrcamentoSupabase(orcamentoId) {
 }
 
 async function salvarConfigSupabase(c) {
-  const { error } = await sb.from("configuracoes_padrao").upsert({
+  const base = {
     usuario_id: state.user.id,
     garantia_padrao: c.garantia,
     forma_pagamento_padrao: c.formaPagamento,
     objetivo: c.objetivo,
     aprovacao_texto: c.aprovacaoTexto,
-  });
+  };
+  let escopoSalvo = true;
+  let { error } = await sb.from("configuracoes_padrao").upsert({ ...base, escopo_padrao: c.escopoServicos });
+  if (error && /escopo_padrao/i.test(error.message || "")) {
+    // Coluna ainda não existe no banco: salva o restante e avisa
+    escopoSalvo = false;
+    ({ error } = await sb.from("configuracoes_padrao").upsert(base));
+  }
   if (error) { alert("Erro ao salvar configurações: " + error.message); return; }
   state.config.garantia = c.garantia;
   state.config.formaPagamento = c.formaPagamento;
   state.config.objetivo = c.objetivo;
   state.config.aprovacaoTexto = c.aprovacaoTexto;
+  state.config.escopoServicos = c.escopoServicos;
+  if (!escopoSalvo) alert("Configurações salvas, mas o texto padrão do Escopo dos serviços só vale até fechar o app: falta criar a coluna 'escopo_padrao' no Supabase (rode o arquivo adicionar_escopo_padrao.sql).");
   state.view = "lista";
   renderPage();
 }
@@ -938,6 +952,33 @@ function itemRowHTML(it) {
 function viewDetalhe() {
   const o = state.orcamentos.find((x) => x.id === state.selectedId);
   if (!o) return `<div class="empty-state">Orçamento não encontrado.</div>`;
+
+  // Campos em branco não aparecem no orçamento (nem na tela, nem na impressão/PDF)
+  const infos = [
+    tem(o.endereco) ? `<span>${ICON.pin} ${o.endereco}</span>` : "",
+    tem(o.prazo) ? `<span>${ICON.calendar} Prazo de execução: ${o.prazo}</span>` : "",
+    tem(o.contato) ? `<span>Contato: ${o.contato}</span>` : "",
+  ].join("");
+
+  const condicoes = [
+    tem(o.garantia) ? `<div class="condicao-item"><strong>Garantia</strong>${o.garantia}</div>` : "",
+    tem(o.formaPagamento) ? `<div class="condicao-item"><strong>Forma de pagamento</strong>${o.formaPagamento}</div>` : "",
+    tem(o.observacoes) ? `<div class="condicao-item" style="grid-column:1/-1;"><strong>Observações</strong>${o.observacoes}</div>` : "",
+  ].join("");
+
+  const secoes = [];
+  if (tem(state.config.objetivo)) secoes.push(["Objetivo", `<p class="detail-texto-padrao">${state.config.objetivo}</p>`]);
+  if (tem(o.escopoServicos)) secoes.push(["Escopo dos serviços", `<p class="detail-texto-padrao">${o.escopoServicos}</p>`]);
+  if (o.itens.length) secoes.push(["Dados do orçamento", `
+      <table class="items-table">
+        <thead><tr><th class="col-desc">Descrição</th><th class="col-un">Unidade</th><th class="col-qtd">Qtd.</th><th class="col-val">Valor unit.</th><th class="col-tot">Total</th></tr></thead>
+        <tbody>${o.itens.map((it) => `<tr><td data-label="Descrição">${it.descricao}</td><td data-label="Unidade">${it.unidade}</td><td class="num" data-label="Qtd.">${it.quantidade}</td><td class="num" data-label="Valor unit.">${formatBRL(it.valorUnitario)}</td><td class="num" data-label="Total">${formatBRL(it.quantidade * it.valorUnitario)}</td></tr>`).join("")}</tbody>
+      </table>
+      <div class="totals-bar"><span style="font-size:13px;color:var(--ink-soft);">Valor total do orçamento</span><span class="totals-value">${formatBRL(totalItens(o.itens))}</span></div>`]);
+  if (condicoes) secoes.push(["Condições", `<div class="condicoes-grid">${condicoes}</div>`]);
+  // Aprovação mantém o título por causa das linhas de assinatura; o texto só aparece se preenchido
+  secoes.push(["Aprovação", tem(state.config.aprovacaoTexto) ? `<p class="detail-texto-padrao">${state.config.aprovacaoTexto}</p>` : ""]);
+
   return `
     <div class="page-header">
       <div><div class="page-title-eyebrow">Orçamento Nº ${o.numero || "-"}</div><div class="page-title">Ficha de obra</div></div>
@@ -951,11 +992,7 @@ function viewDetalhe() {
         <div class="detail-header-cliente">
           <div class="detail-numero">Orçamento Nº ${o.numero || "-"}</div>
           <div class="detail-cliente">${o.cliente}</div>
-          <div class="detail-info">
-            <span>${ICON.pin} ${o.endereco || "-"}</span>
-            <span>${ICON.calendar} Prazo de execução: ${o.prazo || "-"}</span>
-            ${o.contato ? `<span>Contato: ${o.contato}</span>` : ""}
-          </div>
+          ${infos ? `<div class="detail-info">${infos}</div>` : ""}
         </div>
       </div>
       <div class="no-print" style="margin-bottom:16px;">
@@ -966,24 +1003,7 @@ function viewDetalhe() {
           </select>
         </div>
       </div>
-      <div class="detail-block-title" style="margin-top:0;">Objetivo</div>
-      <p class="detail-texto-padrao">${state.config.objetivo}</p>
-      <div class="detail-block-title">Escopo dos serviços</div>
-      <p class="detail-texto-padrao">${o.escopoServicos || "-"}</p>
-      <div class="detail-block-title">Dados do orçamento</div>
-      <table class="items-table">
-        <thead><tr><th class="col-desc">Descrição</th><th class="col-un">Unidade</th><th class="col-qtd">Qtd.</th><th class="col-val">Valor unit.</th><th class="col-tot">Total</th></tr></thead>
-        <tbody>${o.itens.map((it) => `<tr><td data-label="Descrição">${it.descricao}</td><td data-label="Unidade">${it.unidade}</td><td class="num" data-label="Qtd.">${it.quantidade}</td><td class="num" data-label="Valor unit.">${formatBRL(it.valorUnitario)}</td><td class="num" data-label="Total">${formatBRL(it.quantidade * it.valorUnitario)}</td></tr>`).join("")}</tbody>
-      </table>
-      <div class="totals-bar"><span style="font-size:13px;color:var(--ink-soft);">Valor total do orçamento</span><span class="totals-value">${formatBRL(totalItens(o.itens))}</span></div>
-      <div class="detail-block-title">Condições</div>
-      <div class="condicoes-grid">
-        <div class="condicao-item"><strong>Garantia</strong>${o.garantia || "-"}</div>
-        <div class="condicao-item"><strong>Forma de pagamento</strong>${o.formaPagamento || "-"}</div>
-        ${o.observacoes ? `<div class="condicao-item" style="grid-column:1/-1;"><strong>Observações</strong>${o.observacoes}</div>` : ""}
-      </div>
-      <div class="detail-block-title">Aprovação</div>
-      <p class="detail-texto-padrao">${state.config.aprovacaoTexto}</p>
+      ${secoes.map(([titulo, html], i) => `<div class="detail-block-title"${i === 0 ? ' style="margin-top:0;"' : ""}>${titulo}</div>${html}`).join("")}
       <div class="assinaturas-row">
         <div class="assinatura-item">Assinatura do Cliente</div>
         <div class="assinatura-item">Assinatura do Responsável</div>
@@ -1079,6 +1099,11 @@ function configOrcamentoHTML(c) {
       <div class="field-grid">
         <div class="field"><label>Garantia padrão</label><input data-config-field="garantia" value="${c.garantia}" /></div>
         <div class="field"><label>Forma de pagamento padrão</label><input data-config-field="formaPagamento" value="${c.formaPagamento}" /></div>
+        <div class="field full">
+          <label>Escopo dos serviços padrão</label>
+          <textarea data-config-field="escopoServicos" placeholder="Ex: Desmontagem de forro existente, montagem de novo forro...">${esc(c.escopoServicos)}</textarea>
+          <div class="field-hint">Preenche o campo "Escopo dos serviços" em cada novo orçamento (você pode editar em cada um). Se ficar em branco, o escopo não aparece no orçamento impresso.</div>
+        </div>
       </div>
     </div>
     <div class="form-actions">
@@ -1172,6 +1197,7 @@ document.addEventListener("click", async (e) => {
       formaPagamento: state.config.formaPagamento,
       objetivo: state.config.objetivo,
       aprovacaoTexto: state.config.aprovacaoTexto,
+      escopoServicos: state.config.escopoServicos ?? "",
     };
     state.configTab = "orcamento";
     state.view = "config";
